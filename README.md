@@ -9,6 +9,7 @@ A lightweight, no-backend web app for navigating Lake Winnipesaukee from your ph
 - **Public boat launches** — all 18+ NH launches with fees, parking notes, and restrictions
 - **Crowdsourced buoys** — tap a button, tap the map, log any buoy you see while boating. Saves to your phone's localStorage. Export as JSON anytime.
 - **Crowdsourced hazards** — rocks, shoals, shallow areas, strong currents. Same workflow as buoys: tap 📍 → tap map → pick "Hazard". Red triangle on the map.
+- **Trip logging** — every GPS run auto-records a dotted-line trail on the map. When you stop, you get a popup with distance, duration, max speed, and the chance to name it. Past trips stay on the map (toggleable) and can be exported as GPX to open in Google Earth, Garmin BaseCamp, etc.
 
 ## What it does NOT do (yet)
 
@@ -84,7 +85,7 @@ Buoys are circles, hazards are red triangles. Both are stored in your phone's `l
 
 ## Roadmap
 
-- [ ] **v1.1** — Trip logging (record GPS trail, distance, max speed, downloadable GPX)
+- [x] **v1.1** — Trip logging (record GPS trail, distance, max speed, downloadable GPX) ✅ shipped 2026-07-05
 - [ ] **v1.2** — Bridge clearance markers (low-clearance bridges on Winni: Center Harbor, Egg Harbor)
 - [ ] **v1.3** — Marina / restaurant / sand bar markers (POI layer)
 - [ ] **v1.4** — Weather overlay (NOAA station at Wolfeboro)

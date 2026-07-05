@@ -312,6 +312,7 @@
     <label class="layer-toggle"><input type="checkbox" id="layerBuoys" /> Buoys</label>
     <label class="layer-toggle"><input type="checkbox" id="layerLaunches" checked /> Launches</label>
     <label class="layer-toggle"><input type="checkbox" id="layerHazards" checked /> Hazards</label>
+    <label class="layer-toggle"><input type="checkbox" id="layerTrips" checked /> Trips</label>
   </div>
 
   <div id="hudData" class="hud">
@@ -333,7 +334,8 @@
   <div id="actions" class="hud">
     <button class="icon-btn" id="recenterBtn" title="Recenter on me">⊙</button>
     <button class="icon-btn" id="buoyModeBtn" title="Add buoy mode">📍</button>
-    <button class="icon-btn" id="exportBtn" title="Export buoys">💾</button>
+    <button class="icon-btn" id="tripsBtn" title="Trips">🛶</button>
+    <button class="icon-btn" id="exportBtn" title="Export data">💾</button>
     <button class="icon-btn" id="infoBtn" title="Info">ⓘ</button>
   </div>
 
@@ -428,16 +430,26 @@
     let buoyAddMode = false;
     let pendingBuoyLatLng = null;
 
+    // Trip logging
+    let currentTrip = null;        // { name, started, points: [{t, lat, lng, speedKn, headingDeg}] }
+    let currentTripLine = null;    // live polyline
+    let currentTripStartMarker = null;
+    let currentTripEndMarker = null;
+    const TRIP_MIN_INTERVAL_MS = 3000;   // min time between recorded points
+    const TRIP_MIN_MOVE_M = 5;           // min meters moved to count a new point
+
     const layers = {
       islands: null,
       hazards: null,
       launches: null,
       buoys: null,
+      trips: null,
       user: null,
     };
 
     const storedBuoys = JSON.parse(localStorage.getItem('winniBuoys') || '[]');
     const storedHazards = JSON.parse(localStorage.getItem('winniHazards') || '[]');
+    const storedTrips = JSON.parse(localStorage.getItem('winniTrips') || '[]');
 
     // ----- Map setup -----
     function initMap() {
@@ -493,6 +505,10 @@
       layers.buoys = L.layerGroup();
       storedBuoys.forEach(b => addBuoyToLayer(b));
       layers.buoys.addTo(map);
+
+      layers.trips = L.layerGroup();
+      storedTrips.forEach(t => addTripToLayer(t));
+      layers.trips.addTo(map);
 
       map.on('click', onMapClick);
     }
@@ -726,6 +742,185 @@
       document.getElementById('buoyBanner').style.display = 'none';
     }
 
+    // ----- Trip CRUD -----
+    function saveTrips() {
+      localStorage.setItem('winniTrips', JSON.stringify(storedTrips));
+    }
+
+    function addTripToLayer(trip) {
+      if (!trip.points || trip.points.length < 2) return;
+      const latlngs = trip.points.map(p => [p.lat, p.lng]);
+      const line = L.polyline(latlngs, {
+        color: '#1abc9c',
+        weight: 3,
+        opacity: 0.85,
+        dashArray: '6, 6',
+        lineCap: 'round',
+      });
+      const start = trip.points[0];
+      const end = trip.points[trip.points.length - 1];
+      const startIcon = L.divIcon({
+        className: '',
+        html: '<div style="width:12px;height:12px;border-radius:50%;background:#16a085;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.5);"></div>',
+        iconSize: [12, 12], iconAnchor: [6, 6],
+      });
+      const endIcon = L.divIcon({
+        className: '',
+        html: '<div style="width:12px;height:12px;border-radius:50%;background:#e74c3c;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.5);"></div>',
+        iconSize: [12, 12], iconAnchor: [6, 6],
+      });
+      const dist = tripDistanceKm(trip);
+      const dur = tripDurationMin(trip);
+      const maxSp = tripMaxSpeedKn(trip);
+      line.bindPopup(
+        `<strong>${trip.name}</strong><br>` +
+        `<small>${new Date(trip.started).toLocaleString()}</small><br>` +
+        `Distance: ${dist.toFixed(2)} km &middot; Duration: ${dur.toFixed(1)} min<br>` +
+        `Max speed: ${maxSp.toFixed(1)} kn &middot; ${trip.points.length} pts<br>` +
+        `<a href="#" onclick="exportTripGPX('${trip.id}'); return false;">Export GPX</a> ` +
+        `&middot; <a href="#" onclick="deleteTrip('${trip.id}'); return false;">Delete</a>`
+      );
+      line.addTo(layers.trips);
+      L.marker([start.lat, start.lng], { icon: startIcon })
+        .bindTooltip(`Start: ${trip.name}`, { direction: 'top' })
+        .addTo(layers.trips);
+      L.marker([end.lat, end.lng], { icon: endIcon })
+        .bindTooltip(`End: ${trip.name}`, { direction: 'top' })
+        .addTo(layers.trips);
+    }
+
+    function rebuildTripLayer() {
+      layers.trips.clearLayers();
+      storedTrips.forEach(t => addTripToLayer(t));
+    }
+
+    function tripDistanceKm(trip) {
+      let m = 0;
+      for (let i = 1; i < trip.points.length; i++) {
+        m += haversine(trip.points[i-1].lat, trip.points[i-1].lng,
+                       trip.points[i].lat,   trip.points[i].lng);
+      }
+      return m / 1000;
+    }
+    function tripDurationMin(trip) {
+      if (trip.points.length < 2) return 0;
+      return (new Date(trip.points[trip.points.length-1].t) -
+              new Date(trip.points[0].t)) / 60000;
+    }
+    function tripMaxSpeedKn(trip) {
+      return trip.points.reduce((m, p) => Math.max(m, p.speedKn || 0), 0);
+    }
+
+    function startNewTrip(name) {
+      currentTrip = {
+        id: 't' + Date.now() + Math.random().toString(36).slice(2, 7),
+        name: name || ('Trip ' + new Date().toLocaleString()),
+        started: new Date().toISOString(),
+        points: [],
+      };
+      currentTripLine = L.polyline([], {
+        color: '#1abc9c', weight: 4, opacity: 0.9,
+        dashArray: '6, 6', lineCap: 'round',
+      }).addTo(map);
+    }
+
+    function appendTripPoint(lat, lng, speedKn, headingDeg) {
+      if (!currentTrip) return;
+      const t = new Date().toISOString();
+      const last = currentTrip.points[currentTrip.points.length - 1];
+      // Throttle: skip if too soon or haven't moved enough
+      if (last) {
+        const dt = new Date(t) - new Date(last.t);
+        const moved = haversine(last.lat, last.lng, lat, lng);
+        if (dt < TRIP_MIN_INTERVAL_MS && moved < TRIP_MIN_MOVE_M) return;
+      }
+      currentTrip.points.push({ t, lat, lng, speedKn, headingDeg });
+      currentTripLine.addLatLng([lat, lng]);
+    }
+
+    function finishTrip() {
+      if (!currentTrip) return null;
+      const trip = currentTrip;
+      currentTrip = null;
+      if (currentTripLine) { map.removeLayer(currentTripLine); currentTripLine = null; }
+      if (trip.points.length >= 2) {
+        storedTrips.push(trip);
+        saveTrips();
+        addTripToLayer(trip);
+        // Ensure the trips layer is on so the user sees it
+        document.getElementById('layerTrips').checked = true;
+        layers.trips.addTo(map);
+        return trip;
+      }
+      return null;
+    }
+
+    window.deleteTrip = function(id) {
+      const idx = storedTrips.findIndex(t => t.id === id);
+      if (idx === -1) return;
+      storedTrips.splice(idx, 1);
+      saveTrips();
+      rebuildTripLayer();
+      map.closePopup();
+    };
+
+    function tripsToGPX(trip) {
+      const esc = s => String(s).replace(/[<>&'"]/g, c => ({
+        '<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'
+      }[c]));
+      const pts = trip.points.map(p => `
+        <trkpt lat="${p.lat}" lon="${p.lng}">
+          <time>${p.t}</time>
+          ${p.speedKn != null ? `<speed>${(p.speedKn * 0.514444).toFixed(3)}</speed>` : ''}
+          ${p.headingDeg != null ? `<course>${p.headingDeg.toFixed(1)}</course>` : ''}
+        </trkpt>`).join('');
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Winni Nav" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>${esc(trip.name)}</name>
+    <time>${trip.started}</time>
+  </metadata>
+  <trk>
+    <name>${esc(trip.name)}</name>
+    <trkseg>${pts}
+    </trkseg>
+  </trk>
+</gpx>`;
+    }
+
+    window.exportTripGPX = function(id) {
+      const trip = storedTrips.find(t => t.id === id);
+      if (!trip) return;
+      const blob = new Blob([tripsToGPX(trip)], { type: 'application/gpx+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${trip.name.replace(/[^a-z0-9-_]+/gi, '_')}.gpx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    window.exportAllTripsGPX = function() {
+      if (storedTrips.length === 0) return;
+      // Bundle all trips into one multi-track GPX file
+      const tracks = storedTrips.map(t =>
+        `  <trk>\n    <name>${t.name}</name>\n    <trkseg>${t.points.map(p =>
+          `\n      <trkpt lat="${p.lat}" lon="${p.lng}"><time>${p.t}</time></trkpt>`
+        ).join('')}\n    </trkseg>\n  </trk>`).join('\n');
+      const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Winni Nav" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata><name>Winni Nav trips</name><time>${new Date().toISOString()}</time></metadata>
+${tracks}
+</gpx>`;
+      const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `winni-trips-${new Date().toISOString().slice(0,10)}.gpx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
     // ----- GPS tracking -----
     function startTracking() {
       if (!('geolocation' in navigator)) {
@@ -733,6 +928,8 @@
         return;
       }
       document.getElementById('gpsStatus').textContent = 'acquiring…';
+      // Start a fresh trip recording for this session
+      startNewTrip('Trip ' + new Date().toLocaleString());
       watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
         enableHighAccuracy: true,
         maximumAge: 1000,
@@ -766,7 +963,62 @@
       document.getElementById('speed').textContent = '0.0';
       document.getElementById('heading').textContent = '—';
       window.removeEventListener('deviceorientation', onOrient);
+
+      // Finish the trip: if it has enough points, prompt to name it
+      const finishedTrip = finishTrip();
+      if (finishedTrip) {
+        promptNameTrip(finishedTrip);
+      }
     }
+
+    function promptNameTrip(trip) {
+      const modal = document.getElementById('modal');
+      const body = document.getElementById('modalBody');
+      const actions = document.getElementById('modalActions');
+      const title = document.getElementById('modalTitle');
+      title.textContent = 'Trip recorded';
+      const dist = tripDistanceKm(trip);
+      const dur = tripDurationMin(trip);
+      const maxSp = tripMaxSpeedKn(trip);
+      body.innerHTML = `
+        <p style="margin: 0 0 8px;">
+          <strong>${trip.points.length}</strong> points &middot;
+          <strong>${dist.toFixed(2)}</strong> km &middot;
+          <strong>${dur.toFixed(1)}</strong> min &middot;
+          max <strong>${maxSp.toFixed(1)}</strong> kn
+        </p>
+        <label>Name this trip</label>
+        <input type="text" id="tripNameInput" value="${trip.name.replace(/"/g, '&quot;')}" />
+        <p style="font-size:11px;color:#666;margin-top:8px;">
+          Saved to your phone. Tap the trip line on the map later to export as GPX.
+        </p>
+      `;
+      actions.innerHTML = `
+        <button class="btn btn-secondary" onclick="skipTripName()">Keep default</button>
+        <button class="btn btn-primary" onclick="saveTripName('${trip.id}')">Save</button>
+      `;
+      // Auto-select the input so user can just type
+      setTimeout(() => {
+        const el = document.getElementById('tripNameInput');
+        if (el) { el.focus(); el.select(); }
+      }, 100);
+      modal.classList.add('show');
+    }
+
+    window.saveTripName = function(id) {
+      const trip = storedTrips.find(t => t.id === id);
+      if (!trip) return;
+      const input = document.getElementById('tripNameInput');
+      const newName = input ? input.value.trim() : '';
+      if (newName) trip.name = newName;
+      saveTrips();
+      rebuildTripLayer();
+      document.getElementById('modal').classList.remove('show');
+    };
+
+    window.skipTripName = function() {
+      document.getElementById('modal').classList.remove('show');
+    };
 
     function onPos(pos) {
       const c = pos.coords;
@@ -831,6 +1083,9 @@
 
       lastPos = { lat: c.latitude, lng: c.longitude };
       lastTime = now;
+
+      // Record this point in the current trip (throttled inside)
+      appendTripPoint(c.latitude, c.longitude, speedKn, headingDeg);
     }
 
     let lastHeading = null;
@@ -867,6 +1122,91 @@
     }
 
     // ----- UI wiring -----
+    function showTripsModal() {
+      const modal = document.getElementById('modal');
+      const body = document.getElementById('modalBody');
+      const actions = document.getElementById('modalActions');
+      const title = document.getElementById('modalTitle');
+      title.textContent = 'Trips';
+      if (storedTrips.length === 0) {
+        body.innerHTML = `
+          <p>No trips recorded yet.</p>
+          <p style="font-size:12px;color:#666;">
+            Tap <strong>Start GPS</strong> to begin recording a trip.
+            The trip will auto-save when you tap Stop GPS, and you'll get to name it.
+          </p>
+        `;
+        actions.innerHTML = `<button class="btn btn-primary" onclick="cancelModal()">Close</button>`;
+      } else {
+        const totalKm = storedTrips.reduce((s, t) => s + tripDistanceKm(t), 0);
+        const totalMin = storedTrips.reduce((s, t) => s + tripDurationMin(t), 0);
+        const rows = storedTrips
+          .slice()
+          .sort((a, b) => new Date(b.started) - new Date(a.started))
+          .map(t => {
+            const d = tripDistanceKm(t);
+            const dur = tripDurationMin(t);
+            const mx = tripMaxSpeedKn(t);
+            return `
+              <div style="border-bottom:1px solid #eee; padding: 8px 0;">
+                <strong>${escapeHtml(t.name)}</strong>
+                <div style="font-size:12px;color:#555;">
+                  ${new Date(t.started).toLocaleString()}<br>
+                  ${d.toFixed(2)} km &middot; ${dur.toFixed(1)} min &middot; max ${mx.toFixed(1)} kn &middot; ${t.points.length} pts
+                </div>
+                <div style="margin-top: 6px;">
+                  <button class="btn btn-secondary" style="padding:4px 8px;font-size:12px;" onclick="viewTripOnMap('${t.id}')">View</button>
+                  <button class="btn btn-secondary" style="padding:4px 8px;font-size:12px;" onclick="exportTripGPX('${t.id}')">GPX</button>
+                  <button class="btn btn-secondary" style="padding:4px 8px;font-size:12px;" onclick="renameTrip('${t.id}')">Rename</button>
+                  <button class="btn btn-secondary" style="padding:4px 8px;font-size:12px;color:#c0392b;" onclick="deleteTrip('${t.id}'); showTripsModal();">Delete</button>
+                </div>
+              </div>
+            `;
+          }).join('');
+        body.innerHTML = `
+          <p style="font-size:12px;color:#666;margin:0 0 8px;">
+            <strong>${storedTrips.length}</strong> trip${storedTrips.length===1?'':'s'} &middot;
+            <strong>${totalKm.toFixed(2)}</strong> km total &middot;
+            <strong>${totalMin.toFixed(0)}</strong> min total
+          </p>
+          <div style="max-height: 50vh; overflow-y: auto;">${rows}</div>
+        `;
+        actions.innerHTML = `
+          <button class="btn btn-secondary" onclick="cancelModal()">Close</button>
+          ${storedTrips.length > 0 ? `<button class="btn btn-primary" onclick="exportAllTripsGPX()">Export all (GPX)</button>` : ''}
+        `;
+      }
+      modal.classList.add('show');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[<>&'"]/g, c => ({
+        '<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'
+      }[c]));
+    }
+
+    window.viewTripOnMap = function(id) {
+      const trip = storedTrips.find(t => t.id === id);
+      if (!trip || trip.points.length === 0) return;
+      const bounds = L.latLngBounds(trip.points.map(p => [p.lat, p.lng]));
+      map.fitBounds(bounds.pad(0.1));
+      document.getElementById('layerTrips').checked = true;
+      layers.trips.addTo(map);
+      document.getElementById('modal').classList.remove('show');
+    };
+
+    window.renameTrip = function(id) {
+      const trip = storedTrips.find(t => t.id === id);
+      if (!trip) return;
+      const newName = prompt('New name for trip:', trip.name);
+      if (newName != null && newName.trim()) {
+        trip.name = newName.trim();
+        saveTrips();
+        rebuildTripLayer();
+        showTripsModal();
+      }
+    };
+
     function wireUI() {
       const startBtn = document.getElementById('startBtn');
       startBtn.addEventListener('click', () => {
@@ -888,12 +1228,12 @@
       });
 
       document.getElementById('exportBtn').addEventListener('click', () => {
-        const payload = { buoys: storedBuoys, hazards: storedHazards };
+        const payload = { buoys: storedBuoys, hazards: storedHazards, trips: storedTrips };
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `winni-buoys-and-hazards-${new Date().toISOString().slice(0,10)}.json`;
+        a.download = `winni-data-${new Date().toISOString().slice(0,10)}.json`;
         a.click();
         URL.revokeObjectURL(url);
       });
@@ -908,14 +1248,17 @@
           <p><strong>Recreation aid — not for primary navigation.</strong></p>
           <p>Always defer to official charts, visual markers, NH Marine Patrol buoys, and the Bizer chart.</p>
           <p style="font-size:12px;color:#666;">
-            Layers: buoys (community-contributed), hazards (community-contributed), public launches.<br>
+            Layers: buoys (community-contributed), hazards (community-contributed), public launches, past trips.<br>
             Data sources: Roche Realty launch list, OpenStreetMap base map.<br>
-            Tap 📍 then tap the map to add a buoy or hazard — pick which in the popup.
+            Tap 📍 then tap the map to add a buoy or hazard — pick which in the popup.<br>
+            Tap 🛶 to view, rename, export (GPX), or delete past trips.<br>
+            Trips auto-record while GPS is on and auto-save when you stop.
           </p>
           <p style="font-size:12px;color:#666;">
             <strong>Buoys saved locally:</strong> ${storedBuoys.length}<br>
             <strong>Hazards saved locally:</strong> ${storedHazards.length}<br>
-            Use 💾 to export your data as a JSON file.
+            <strong>Trips saved locally:</strong> ${storedTrips.length}<br>
+            Use 💾 to export your buoys + hazards as JSON, or 🛶 to export trips as GPX.
           </p>
         `;
         actions.innerHTML = `<button class="btn btn-primary" onclick="cancelModal()">Close</button>`;
@@ -934,6 +1277,12 @@
         if (e.target.checked) layers.hazards.addTo(map);
         else map.removeLayer(layers.hazards);
       });
+      document.getElementById('layerTrips').addEventListener('change', e => {
+        if (e.target.checked) layers.trips.addTo(map);
+        else map.removeLayer(layers.trips);
+      });
+
+      document.getElementById('tripsBtn').addEventListener('click', showTripsModal);
     }
 
     // ----- Boot -----
