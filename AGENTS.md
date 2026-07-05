@@ -1,0 +1,181 @@
+# AGENTS.md — Winni Nav project context
+
+> **Read this first if you're a new agent picking up the Winni Nav project.**
+> It is intentionally lean and project-specific. General OpenClaw behavior is in `/usr/lib/node_modules/openclaw/docs/AGENTS.md`.
+
+## TL;DR
+
+A single-file static web app (`index.html`, ~62 KB) that gives Winnipesaukee boaters a Garmin-HUD-style map with live GPS, crowdsourced buoys/hazards, NH GRANIT bathymetry (low-confidence reference), and GPS trip logging with GPX export. No backend. Auto-deploys to Vercel on push to `main`.
+
+## Identity
+
+| Field    | Value                                                                |
+| -------- | -------------------------------------------------------------------- |
+| Project  | Winni Nav                                                            |
+| Owner    | Tyler (`HodlMyBeer12`, telegram 8511611117)                          |
+| Repo     | `github.com/hodlmybeer21/lakewinnie.goodbotai.tech`                  |
+| Host     | Vercel (auto-deploy on push to `main`)                               |
+| URL      | https://lakewinnie.goodbotai.tech                                    |
+| Build    | None — single static `index.html`, served as-is                      |
+| Stack    | Leaflet 1.9.4 (CDN) + OpenStreetMap tiles + vanilla JS + localStorage |
+
+## Layout
+
+```
+winni-map/
+├── index.html        ← ENTIRE APP. Single file, ~62 KB. HTML + CSS + JS.
+├── README.md         ← User-facing documentation
+├── AGENTS.md         ← This file (session handoff)
+├── vercel.json       ← Vercel config (static, root = index.html)
+├── .gitignore
+├── .vercel/          ← Vercel project metadata (auto)
+└── scripts/          ← Build scripts (mostly archived; only `build-nowake-zones.py` remains but unused)
+```
+
+## What the app does (built 2026-07-05)
+
+1. **Live GPS** — speed (kn), heading (°), compass rose, accuracy circle.
+2. **Public boat launches** — 18+ NH launches with fees/notes, hardcoded `LAUNCHES` array in index.html.
+3. **Islands** — hardcoded `ISLANDS` polygon array, gray fill.
+4. **Crowdsourced buoys** — `localStorage.winniBuoys`. 4 types: red, green, white, yellow.
+5. **Crowdsourced hazards** — `localStorage.winniHazards`. 5 types: rock, submerged, shallow, current, other. Red triangle markers.
+6. **Crowdsourced depth soundings** — `localStorage.winniDepths`. **DORMANT in current prod** (modal button + layer checkbox removed in commit `4b9a260` but the helpers + storage are still in the code, ready to re-enable). See "Toggling depths on/off" below.
+7. **NH GRANIT bathymetry** — `layers.bathyLines` + `layers.bathyBands`. Off by default. Loads from `nhgeodata.unh.edu` and `granit24a.sr.unh.edu` (CORS-friendly for the deployed origin). Cached in localStorage with 30-day TTL. Yellow disclaimer banner shown while layer is on; every popup repeats "NOT for navigation — verify on the Bizer chart."
+8. **Trip logging** — `localStorage.winniTrips`. Every GPS run auto-records a teal dotted trail behind the boat, throttled to ~3s or 5m of movement. On Stop GPS, prompts to name the trip. Past trips exportable as GPX.
+
+## Workflow for adding a new layer (the pattern)
+
+When Tyler asks for a new crowdsourced layer (buoys, hazards, depth soundings all followed this exact pattern):
+
+1. **State + storage** — `storedXxx = JSON.parse(localStorage.getItem('winniXxx') || '[]')` near the other `storedXxx` declarations.
+2. **Layer object** — add `xxx: null` to the `layers` object; initialize with `L.layerGroup()` in `initMap()`; populate from storage.
+3. **CRUD block** — `addXxxToLayer`, `saveXxx`, `addXxx`, `deleteXxx` (window-exposed), `rebuildXxxLayer`. Mirror the hazard code; it's the cleanest example.
+4. **Type constants** — `XXX_TYPES` object near `BUOY_TYPES`/`HAZARD_TYPES` (color, label).
+5. **Modal flow** — if it goes through the 📍 modal, add a button to `showAddChoiceModal`'s actions row, a `showXxxModal()` function, and a `confirmXxx()` handler.
+6. **Layer toggle** — add `<label class="layer-toggle">` to the layer panel and a `change` listener in `wireUI`.
+7. **Export** — include in the JSON payload of `exportBtn`.
+8. **Info modal** — bump the saved-locally counter.
+9. **Marker CSS** — if it needs a custom divIcon, add a class to the `.buoy-marker` / `.hazard-marker` / `.depth-marker` block in the `<style>` section.
+
+## Critical rules — do not violate
+
+These were all hard-won. Don't re-make any of these mistakes.
+
+1. **NEVER add hardcoded geographic data unless it comes from a named, authoritative source AND is clearly labeled "low-confidence reference".** Tyler has removed four such layers over the course of building this app because they were inaccurate:
+   - Duck-shaped lake outline polygon (commit `1b5f7c1`)
+   - NH GRANIT shoreline overlay (commit `e0a0a39`)
+   - No-wake zones (50 polygons, commit `8317396`)
+   - Static hazards (Three Broads / Rocky Shoal / Five-Finger Point, commit `4b9a260`'s parent)
+
+   **If a data source isn't authoritative for navigation, it goes behind a toggle that's off by default with a permanent in-app disclaimer.** NH GRANIT bathymetry is the only acceptable exception, and only because the NHDES license explicitly says "SHOULD NOT be used for navigational purposes" — we surface that exact wording.
+
+2. **Always defer to the Bizer chart for navigation.** The app's persistent tagline: "Recreation aid — not for primary navigation."
+
+3. **JS parse check before commit.** After editing `index.html`, run:
+   ```bash
+   node -e "const html=require('fs').readFileSync('index.html','utf8');const m=html.match(/<script>([\s\S]*?)<\/script>/g);const code=m[m.length-1].replace(/^<script>/,'').replace(/<\/script>$/,'');try{new Function(code);console.log('JS OK,',code.length,'bytes')}catch(e){console.log('ERR:',e.message)}"
+   ```
+   Must print `JS OK, ...`. If it prints `ERR: ...`, do not push.
+
+4. **Vercel can take a moment to redeploy after a force-push.** If `git reset --hard <old-sha> && git push --force-with-lease` doesn't appear to redeploy, do a no-op empty commit (`git commit --allow-empty -m "Re-trigger Vercel deploy"`) and push. Also check `x-vercel-cache: MISS` and `age: 0` on a cache-busted `curl` to confirm fresh deploy.
+
+5. **NH GRANIT endpoints require the deployed origin for CORS.** They `vary: Origin` and `access-control-allow-origin` returns the request origin. If Tyler ever changes the deploy URL, the bathymetry fetch will fail with a CORS error. CORS test:
+   ```bash
+   curl -sI -H 'Origin: https://lakewinnie.goodbotai.tech' \
+     'https://nhgeodata.unh.edu/hosting/rest/services/Hosted/EDP_Bathymetry_Lakes/FeatureServer/0/query?where=1=1&f=json&returnCountOnly=true'
+   ```
+   Should return HTTP 200 with `access-control-allow-origin: https://lakewinnie.goodbotai.tech`.
+
+## Toggling depths on/off
+
+The depth soundings UI (modal button + layer toggle) was removed in commit `4b9a260` per Tyler's request, but the underlying machinery stayed in place:
+
+- `layers.depths` layer group — initialized in `initMap`, populated from `storedDepths`
+- `HAZARD_TYPES`-style depth marker icon (`depthColor`, `depthIcon`, `.depth-marker` CSS)
+- CRUD: `addDepthToLayer`, `addDepth`, `deleteDepth`, `rebuildDepthLayer`
+- `showDepthModal`, `confirmDepth` modal flow
+- Export includes `depths` array
+
+To re-enable the UI: add `<button class="btn btn-secondary" onclick="showDepthModal()">📏 Depth</button>` to `showAddChoiceModal`'s actions, and `<label class="layer-toggle"><input type="checkbox" id="layerDepths" /> Depth soundings (yours)</label>` to the layer panel. Also re-attach the `layerDepths` change listener and the `confirmDepth` "make layer visible" code in the save handler.
+
+## Working with Vercel + the force-push gotcha
+
+This has bitten us once. If you need to roll back to an earlier commit:
+
+```bash
+cd /root/.openclaw/workspace/projects/winni-map
+git reset --hard <old-sha>
+git push --force-with-lease origin main
+# Then verify Vercel picked it up:
+curl -sI "https://lakewinnie.goodbotai.tech/?cb=$(date +%s)" | grep -i age
+# Should show 'age: 0' and 'x-vercel-cache: MISS'.
+# If not, do an empty commit to wake Vercel up:
+git commit --allow-empty -m "Re-trigger Vercel deploy"
+git push origin main
+```
+
+## Useful commands
+
+```bash
+# Validate JS in index.html
+cd /root/.openclaw/workspace/projects/winni-map
+node -e "const html=require('fs').readFileSync('index.html','utf8');const m=html.match(/<script>([\s\S]*?)<\/script>/g);const code=m[m.length-1].replace(/^<script>/,'').replace(/<\/script>$/,'');try{new Function(code);console.log('JS OK,',code.length,'bytes')}catch(e){console.log('ERR:',e.message)}"
+
+# Verify live deploy is fresh + serves new code
+curl -sI "https://lakewinnie.goodbotai.tech/?cb=$(date +%s)" | grep -iE "age|x-vercel-cache"
+curl -s  "https://lakewinnie.goodbotai.tech/?cb=$(date +%s)" | grep -c "loadNHGranitBathy"
+
+# Test NH GRANIT CORS
+curl -sI -H 'Origin: https://lakewinnie.goodbotai.tech' \
+  'https://nhgeodata.unh.edu/hosting/rest/services/Hosted/EDP_Bathymetry_Lakes/FeatureServer/0/query?where=1=1&f=json&returnCountOnly=true'
+
+# Check git state
+cd /root/.openclaw/workspace/projects/winni-map && git status --short && git log --oneline -5
+```
+
+## Open items / pending decisions
+
+- **VT double-post cron fix** — Tyler hasn't given go-ahead.
+- **No-wake zones** — removed 2026-07-05 (was inaccurate). Could come back as crowdsourced like buoys/hazards if Tyler wants them, but not requested yet.
+- **Lake shoreline overlay** — removed 2026-07-05. Same: could be crowdsourced if Tyler wants it back.
+- **Duck-shaped lake outline** — removed. Permanent dead. Don't recreate it.
+- **Depth soundings UI** — currently dormant. Re-enable on request.
+
+## Recent commit history (for context)
+
+- `592134c` — empty commit to retrigger Vercel deploy after force-rollback
+- `4b9a260` — Remove depth soundings option (kept layer + helpers dormant)
+- `a75ae46` — Add NH GRANIT bathymetry + depth soundings
+- `03af400` — Trip logging: live trail, auto-save, GPX export
+- `7329681` — Convert hazards from static layer to crowdsourced
+- `e624e44` — Fix hazard locations (Five-Finger Point was on Mount Major, not in lake)
+- `1b5f7c1` — Remove duck-shaped lake outline polygon
+- `e0a0a39` — Remove NH GRANIT lake shoreline overlay
+- `8317396` — Remove no-wake zones layer
+- `fc97b65` — Initial release: Winni Nav v1
+
+## Known gotchas that will bite you
+
+1. **`haversine()` is used by trip append logic and called from `onPos()` at runtime, but declared AFTER `onPos()` in source order.** It works because it's a function declaration (hoists). Don't refactor it to a `const = () =>` arrow or it'll break.
+
+2. **`appendTripPoint` is called from `onPos`, which is invoked by the GPS watcher.** Same hoisting rule applies to any helper called from `onPos`.
+
+3. **Leaflet `setRotationAngle`** is used for the user marker heading. It's a `leaflet-rotatedmarker`-style API; if you swap Leaflet versions, this might break. Pin Leaflet to 1.9.4 (already pinned via CDN).
+
+4. **`modal` CSS class** — adding `.show` shows it; removing hides. The depth-soundings modal prompt reuses the same modal element. Don't introduce a second modal.
+
+5. **`onMapClick` only fires when `buoyAddMode === true`**, which is the 📍-button-toggled mode. So adding a non-buoy layer through a different button (e.g. an "add hazard here" map-click) requires entering buoy-add mode first, or refactoring.
+
+6. **Trip popup's "View" button calls `viewTripOnMap(id)` which fits bounds and dismisses the modal.** If you add more layers to trips (e.g. waypoints), the bounds-fit logic may need updating.
+
+7. **The Trips layer uses `lineCap: 'round'` + `dashArray: '6, 6'`** for the dotted-line aesthetic. Don't change to solid.
+
+8. **localStorage quota is ~5 MB per origin.** NH GRANIT bathymetry GeoJSON is ~10 MB total, so we cache lines (3.7 MB) and bands (6.5 MB) separately in localStorage. If the quota is exceeded the cache write fails silently and re-fetches next session.
+
+## Contact
+
+If you break something, Tyler prefers you:
+1. Fix it directly if the fix is obvious
+2. Otherwise, ask before making a destructive change (especially anything that touches `localStorage` keys or removes geographic data)
+
+Tyler's Telegram: 8511611117. He communicates mostly by voice message (transcripts are auto-generated and posted as text) — make sure to read the conversation context blocks for the actual request, not just the most recent message.

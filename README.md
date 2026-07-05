@@ -2,73 +2,76 @@
 
 A lightweight, no-backend web app for navigating Lake Winnipesaukee from your phone's GPS — like a Garmin HUD, but in Chrome.
 
+Live: **https://lakewinnie.goodbotai.tech**
+
 ## What it does
 
 - **Live GPS dot** for your boat (phone GPS, ~3 m accuracy)
 - **Speed** in knots + **heading** in degrees + **compass rose**
 - **Public boat launches** — all 18+ NH launches with fees, parking notes, and restrictions
+- **Major islands** (rough polygons, for orientation only)
 - **Crowdsourced buoys** — tap a button, tap the map, log any buoy you see while boating. Saves to your phone's localStorage. Export as JSON anytime.
-- **Crowdsourced hazards** — rocks, shoals, shallow areas, strong currents. Same workflow as buoys: tap 📍 → tap map → pick "Hazard". Red triangle on the map.
-- **Crowdsourced depth soundings** — log a depth from your depth finder at your current location. Color-coded markers. Builds up a community dataset over time.
-- **NH GRANIT bathymetry (reference)** — bathymetric contours and depth bands from NH GRANIT/NHDES. Off by default. Always carries a disclaimer: "NOT for navigation — verify on the Bizer chart." Cached locally so it only downloads once per device.
-- **Trip logging** — every GPS run auto-records a dotted-line trail on the map. When you stop, you get a popup with distance, duration, max speed, and the chance to name it. Past trips stay on the map (toggleable) and can be exported as GPX to open in Google Earth, Garmin BaseCamp, etc.
+- **Crowdsourced hazards** — rocks, shoals, shallow areas, strong currents. Same workflow as buoys. Red triangle markers.
+- **NH GRANIT bathymetry** — bathymetric contours (every 20 ft) and depth-band polygons from NH GRANIT/NHDES. **Off by default** with a permanent disclaimer banner while on. Cached locally so it only downloads once per device.
+- **Trip logging** — every GPS run auto-records a dotted-line trail on the map. When you stop, you get a popup with distance, duration, max speed, and the chance to name it. Past trips stay on the map and can be exported as GPX (Google Earth, Garmin BaseCamp, etc.).
 
 ## What it does NOT do (yet)
 
 - **No official buoy data.** USCG ATON dataset is coastal-only — inland lake buoys on Winnipesaukee are maintained by NH Marine Patrol (~600 of them) and not published in machine-readable form. The printed **Bizer chart** sold at marinas is the authoritative source. Buoy layer is user-contributed; populate it by boating and tapping.
-- **No named hazards.** Earlier versions had hardcoded hazard points (The Broads, Rocky Shoal, Five-Finger Point), but the coordinates were not authoritative and several were in the wrong place. Removed 2026-07-05 — hazards are now crowdsourced the same way as buoys. When you see a hazard on the water, add it.
+- **No hardcoded hazards.** Earlier versions had hardcoded points (The Broads, Rocky Shoal, Five-Finger Point), but the coordinates were not authoritative and several were in the wrong place. Hazards are now crowdsourced the same way as buoys.
+- **No no-wake zones.** Earlier versions included 50 zones from NH Admin Rules, but the polygon coordinates were inaccurate. Removed 2026-07-05. A crowdsourced no-wake layer would work the same way as buoys if you want one.
 - **Not a navigation system.** Recreation aid. Always defer to official charts and visual markers.
 
 ## Files
 
 ```
 winni-map/
-├── index.html        ← The whole app (HTML + CSS + JS, single file)
-├── README.md         ← This file
-└── data/             ← Empty. Reserved for future tile caches or exports.
+├── index.html        ← The whole app (HTML + CSS + JS, single file, ~62 KB)
+├── README.md         ← This file (user-facing)
+├── AGENTS.md         ← Session handoff for future agents (project context)
+└── vercel.json       ← Vercel static config
 ```
 
 ## How to use it
 
-### Option 1: Open on your phone (no hosting needed)
-1. Install **a-Shell** or **iSH** on iOS, or use any file manager on Android
-2. Copy `index.html` to your phone
-3. Open it in Chrome / Safari
+### Open on your phone
+1. Open **https://lakewinnie.goodbotai.tech** in Chrome or Safari
+2. Tap **Start GPS** and grant location permission
+3. Your dot will start updating on the map
 
-Works, but **HTTPS is required for `navigator.geolocation`** in most browsers. So Option 2 is recommended.
-
-### Option 2: GitHub Pages (free, recommended)
-1. Create a GitHub repo, push `index.html`
-2. Settings → Pages → Deploy from branch `main` → `/ (root)`
-3. Visit `https://yourusername.github.io/repo-name/`
-4. On your phone, open that URL in Chrome, tap **Start GPS**, grant location permission
-
-The phone GPS will start updating your position on the map.
-
-### Option 3: Any static host
-Netlify, Vercel, Cloudflare Pages, S3 — all work. Just upload `index.html`.
-
-### Option 4: Local server (testing)
+### Local development
 ```bash
 cd winni-map
 python3 -m http.server 8765
-# open http://localhost:8765 in Chrome
+# open http://localhost:8765
 ```
 
-## Crowdsourcing the buoys and hazards
+Note: HTTPS is required for `navigator.geolocation` in most browsers, so the hosted URL works better than localhost for testing GPS.
 
-Since official data isn't freely available, the buoy and hazard layers are built by **you and your crew** while boating:
+## Crowdsourcing buoys and hazards
 
-1. Open the app, tap **📍** (bottom-right) to enter add mode
+Since official data isn't freely available, these layers are built by **you and your crew** while boating:
+
+1. Tap **📍** (bottom-right) to enter add mode
 2. Tap anywhere on the map where you see a buoy or hazard
 3. Pick **Buoy** or **Hazard**
-4. Pick its type/color (red nun / green can / white / yellow for buoys; rock / submerged / shallow / current / other for hazards)
-5. Add an optional note (e.g. "marks submerged rock, white stripe")
+4. Pick its type/color
+5. Add an optional note
 6. Tap **Save**
 
-Buoys are circles, hazards are red triangles. Both are stored in your phone's `localStorage` and persist across sessions on the same device/browser.
+Buoys are circles (red nun / green can / white / yellow), hazards are red triangles (rock / submerged / shallow / current / other). Both are stored in `localStorage` and persist across sessions on the same device.
 
-**Export** — tap 💾 to download your buoys and hazards as a JSON file. Share it with friends. I can merge multiple JSON files into a community dataset if this gets traction.
+**Export** — tap 💾 to download your data as JSON.
+
+## Trip logging
+
+Tap **Start GPS** to begin a trip. A teal dotted line trails behind your boat as you move. When you tap **Stop GPS**, the trip auto-saves and a popup asks for a name. Past trips are visible (toggleable via the Trips layer) and can be exported as GPX from the 🛶 Trips modal — individually or all-at-once.
+
+## NH GRANIT bathymetry (reference)
+
+Toggle **NH Bathymetry** in the layer panel. While on, a yellow disclaimer banner stays visible: *"NH Bathymetry (NH GRANIT/NHDES) — reference only, NOT for navigation. Verify on the Bizer chart."* The NHDES license says exactly this — we surface it.
+
+Data is fetched once from NH GRANIT/NHDES feature services and cached in localStorage for 30 days. The fetch is ~10 MB total.
 
 ## How it works (technical)
 
@@ -76,22 +79,23 @@ Buoys are circles, hazards are red triangles. Both are stored in your phone's `l
 - **OpenStreetMap** tiles (free, no API key)
 - **`navigator.geolocation.watchPosition`** with `enableHighAccuracy: true` for GPS
 - **`DeviceOrientationEvent`** for compass heading on iOS (`webkitCompassHeading`) and Android (`alpha`)
-- **`localStorage`** for buoy persistence
-- **Single 32 KB HTML file** — no build step, no dependencies to install
+- **`localStorage`** for all crowdsourced data persistence
+- **Single-file deploy** — no build step, no dependencies to install
 
 ## Data sources
 
 - **Public launches:** [Roche Realty Lake Winnipesaukee launch list](https://rocherealty.com/boat-launches/), cross-checked with [lakewinnipesaukee.net](http://lakewinnipesaukee.net/boating/boat-launches-lakes-region-nh/)
-- **No-wake zones:** No layer in this build. Removed 2026-07-05 (was inaccurate).
-- **Buoys, hazards, & depth soundings:** Community-contributed. Authoritative source: Bizer chart (paper) + NH Marine Patrol buoys on the water.
-- **NH GRANIT bathymetry:** NH Department of Environmental Services, via NH GRANIT. **Not for navigation** — see the NHDES license. The app shows a disclaimer banner whenever this layer is on and repeats it in every popup.
+- **NH GRANIT bathymetry:** [NH Department of Environmental Services](https://nhgeodata.unh.edu), via NH GRANIT. **Not for navigation** — the NHDES license explicitly says so. The app shows a disclaimer banner whenever this layer is on and repeats it in every popup.
+- **Buoys & hazards:** Community-contributed. Authoritative source: Bizer chart (paper) + NH Marine Patrol buoys on the water.
 
 ## Roadmap
 
-- [x] **v1.1** — Trip logging (record GPS trail, distance, max speed, downloadable GPX) ✅ shipped 2026-07-05
-- [ ] **v1.2** — Bridge clearance markers (low-clearance bridges on Winni: Center Harbor, Egg Harbor)
-- [ ] **v1.3** — Marina / restaurant / sand bar markers (POI layer)
-- [ ] **v1.4** — Weather overlay (NOAA station at Wolfeboro)
+- [x] **v1.1** — Trip logging ✅ shipped 2026-07-05
+- [x] **v1.2** — Hazards crowdsourced ✅ shipped 2026-07-05
+- [x] **v1.3** — NH GRANIT bathymetry reference layer ✅ shipped 2026-07-05
+- [ ] **v1.4** — Bridge clearance markers (low-clearance bridges on Winni: Center Harbor, Egg Harbor)
+- [ ] **v1.5** — Marina / restaurant / sand bar markers (POI layer)
+- [ ] **v1.6** — Weather overlay (NOAA station at Wolfeboro)
 - [ ] **v2.0** — Multi-user live tracking (backend, friends can see each other)
 
 ## License
