@@ -361,10 +361,17 @@
     ];
 
     // ----- Named hazards / rocky shoals (informational) -----
+    // Coordinates from Bizer chart + cross-checked against OSM lake shoreline.
+    // These are not authoritative — NH Marine Patrol buoys are. 2026-07-05.
     const HAZARDS = [
-      { name: "The Broads", lat: 43.6080, lng: -71.1600, note: "Wide shallow section, mind the depth." },
-      { name: "Rocky Shoal", lat: 43.5510, lng: -71.3300, note: "Submerged rocks — buoys mark them." },
-      { name: "Five-Finger Point", lat: 43.5340, lng: -71.3020, note: "Rocks extend out from point." },
+      // The Broads — wide shallow section in the center of the lake,
+      // roughly between Long Island and the central channels.
+      { name: "The Broads", lat: 43.6680, lng: -71.3300, note: "Wide shallow section in central lake — mind the depth." },
+      // Rocky Shoal — submerged rocks near Meredith, south of Bear Island channel
+      { name: "Rocky Shoal (Meredith)", lat: 43.6590, lng: -71.4310, note: "Submerged rocks — buoys mark them." },
+      // Five-Finger Point — rocky peninsula on southwest shore of Alton Bay,
+      // near where Mt Major Road meets the lake.
+      { name: "Five-Finger Point", lat: 43.4910, lng: -71.2620, note: "Rocks extend out from point on Alton Bay SW shore." },
     ];
 
     // ----- Public boat launches -----
