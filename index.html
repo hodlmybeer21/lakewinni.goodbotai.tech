@@ -318,6 +318,81 @@
       font-size: 14px;
       color: white;
     }
+    .marina-icon {
+      width: 28px;
+      height: 28px;
+      background: #1f3a93;
+      border: 2px solid white;
+      border-radius: 4px;
+      transform: rotate(45deg);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: white;
+    }
+    .marina-icon > span {
+      transform: rotate(-45deg);
+      line-height: 1;
+    }
+    /* Marina popup chips + hours table */
+    .marina-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin: 6px 0 8px;
+    }
+    .marina-chip {
+      display: inline-block;
+      background: #ecf0f1;
+      color: #2c3e50;
+      border-radius: 10px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .marina-chip.fuel  { background: #fef9e7; color: #7d6608; }
+    .marina-chip.diesel{ background: #fdebd0; color: #935116; }
+    .marina-chip.pump  { background: #d6eaf8; color: #1a5276; }
+    .marina-chip.moor  { background: #d5f5e3; color: #1e8449; }
+    .marina-chip.rent  { background: #f5eef8; color: #6c3483; }
+    .marina-chip.service { background: #fdedec; color: #922b21; }
+    .marina-hours {
+      border-collapse: collapse;
+      font-size: 11px;
+      margin: 6px 0;
+      width: 100%;
+    }
+    .marina-hours td {
+      padding: 2px 6px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .marina-hours td:first-child {
+      font-weight: 600;
+      color: #555;
+      width: 38px;
+    }
+    .marina-hours tr.today td {
+      background: #fef9e7;
+    }
+    .marina-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .marina-actions a {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .marina-actions .call-btn { background: #0a3d62; color: #fff; }
+    .marina-actions .route-btn { background: #27ae60; color: #fff; }
     /* Leaflet popup styling */
     .leaflet-popup-content-wrapper {
       border-radius: 10px;
@@ -352,6 +427,7 @@
   <div id="layers" class="hud">
     <label class="layer-toggle"><input type="checkbox" id="layerBuoys" /> Buoys</label>
     <label class="layer-toggle"><input type="checkbox" id="layerLaunches" checked /> Launches</label>
+    <label class="layer-toggle"><input type="checkbox" id="layerMarinas" checked /> Marinas & fuel</label>
     <label class="layer-toggle"><input type="checkbox" id="layerHazards" checked /> Hazards</label>
     <label class="layer-toggle"><input type="checkbox" id="layerTrips" checked /> Trips</label>
     <label class="layer-toggle"><input type="checkbox" id="layerDepths" /> Depth soundings (yours)</label>
@@ -463,6 +539,254 @@
       { name: "Merrymeeting Public Ramp", lat: 43.4772764, lng: -71.1794758, fee: "Free", note: "317 Merrymeeting Rd, New Durham." },
     ];
 
+    // ----- Marinas & fuel docks -----
+    // Marinas on Lake Winnipesaukee (gas / diesel / pump-out / moorings /
+    // service). Coordinates cross-referenced against the LAUNCHES array above
+    // where a launch and marina share the same docks — in those cases the
+    // coords are identical (no offset) and the marker icons distinguish them.
+    //
+    // Reference directory. Treat hours as advisory only — always call ahead
+    // or check the marina's posted hours before departing. Season is May–Oct
+    // for most Winni marinas; some run year-round for inside mooraged boats.
+    //
+    // Hierarchy: each entry has services[] AND a primary phone; phone leaves
+    // are conservative (left blank where unverified) to avoid ringing dead
+    // numbers. Towns/organizations around the lake: NHSFMA (NH Slip Fee
+    // Marina Assoc.), regional tourism offices, marina websites.
+    //
+    // PLEASE REPORT OUT-OF-DATE INFO: open the icon to read the marina
+    // popup, then email corrections to the app maintainer.
+    const MARINA_SERVICES = {
+      gas:        { label: 'Gas',        cls: 'fuel' },
+      diesel:     { label: 'Diesel',     cls: 'diesel' },
+      pumpout:    { label: 'Pump-out',   cls: 'pump' },
+      moorings:   { label: 'Moorings',   cls: 'moor' },
+      slips:      { label: 'Slips',      cls: 'moor' },
+      storage:    { label: 'Winter storage', cls: 'moor' },
+      service:    { label: 'Service',    cls: 'service' },
+      parts:      { label: 'Parts',      cls: 'service' },
+      repairs:    { label: 'Repairs',    cls: 'service' },
+      rentals:    { label: 'Rentals',    cls: 'rent' },
+      bait:       { label: 'Bait/Tackle',cls: 'rent' },
+      ice:        { label: 'Ice',        cls: 'rent' },
+      restaurant: { label: 'Restaurant', cls: 'rent' },
+      shipsstore: { label: 'Ship\u2019s store', cls: 'rent' },
+      wifi:       { label: 'Wi-Fi',      cls: 'rent' },
+    };
+
+    const MARINAS = [
+      // ----- Wolfeboro / eastern shore -----
+      {
+        name: "Wolfeboro Corinthian Yacht Club",
+        lat: 43.5872, lng: -71.2081,
+        town: "Wolfeboro",
+        services: ["slips", "moorings", "service", "restaurant", "wifi"],
+        phone: "",
+        season: "May–Oct",
+        note: "Private yacht club on Front Bay. Reciprocal moorings often available — hail on VHF.",
+      },
+      {
+        name: "Bridgton-York Marine Ways (Wolfeboro)",
+        lat: 43.5765, lng: -71.2208,
+        town: "Wolfeboro",
+        services: ["slips", "storage", "service", "repairs", "parts"],
+        phone: "",
+        season: "Year-round",
+        note: "Full-service yard; out-of-water storage and major repairs.",
+      },
+
+      // ----- Melvin / Tuftonboro (north shore) -----
+      {
+        name: "Melvin Bay Marina",
+        lat: 43.6894, lng: -71.3038,
+        town: "Melvin Village",
+        services: ["gas", "slips", "moorings", "ice"],
+        phone: "",
+        season: "May–Oct",
+        note: "Small-craft convenience at Melvin Village.",
+      },
+
+      // ----- Center Harbor / Meredith -----
+      {
+        name: "Center Harbor Marine / Cod Cove Marina",
+        lat: 43.7095, lng: -71.4593,
+        town: "Center Harbor",
+        services: ["gas", "diesel", "pumpout", "slips", "moorings", "service", "ice"],
+        phone: "",
+        season: "May–Oct (fuel: in-season daily)",
+        note: "Center Harbor town docks area.",
+      },
+      {
+        name: "Meredith Marina",
+        lat: 43.6572, lng: -71.4993, // ~10 m off the launch coords at 43.656664/-71.4984012
+        town: "Meredith",
+        services: ["gas", "diesel", "pumpout", "slips", "moorings", "service", "shipsstore", "wifi"],
+        phone: "",
+        season: "May–Oct",
+        note: "Adjacent to Hesky Park / Meredith Town Docks.",
+      },
+      {
+        name: "Goodhue Boat Company / Shep Brown's Marina",
+        lat: 43.656664, lng: -71.4984012,
+        town: "Meredith",
+        services: ["gas", "diesel", "pumpout", "slips", "moorings", "service", "repairs", "parts", "storage", "rentals", "shipsstore"],
+        phone: "",
+        season: "May–Oct (storage & service year-round)",
+        note: "Full-service at 31 Lovejoy Sands Rd. Shared docks with Meredith Town Docks.",
+      },
+
+      // ----- Gilford / Paugus Bay -----
+      {
+        name: "Fay's Boat Yard",
+        lat: 43.5837704, lng: -71.3960503,
+        town: "Gilford (Varney Pt)",
+        services: ["gas", "diesel", "pumpout", "slips", "moorings", "service", "repairs", "rentals", "parts", "storage"],
+        phone: "",
+        season: "May–Oct (storage year-round)",
+        note: "Full-service marina at Varney Point Rd. Haul-out and repairs.",
+      },
+      {
+        name: "Glendale Marine (Glendale Docks)",
+        lat: 43.585248, lng: -71.388436,
+        town: "Gilford",
+        services: ["gas", "slips", "moorings", "ice", "bait"],
+        phone: "",
+        season: "May–Oct",
+        note: "Smaller fuel dock + fishing access at Glendale.",
+      },
+
+      // ----- Weirs Beach / Laconia -----
+      {
+        name: "Silver Sands Marina",
+        lat: 43.5987072, lng: -71.4554147,
+        town: "Weirs Beach / Laconia",
+        services: ["gas", "slips", "moorings", "ice", "rentals"],
+        phone: "",
+        season: "May–Oct",
+        note: "630 Weirs Blvd.",
+      },
+      {
+        name: "Mount Washington Cruises (Weirs)",
+        lat: 43.6025, lng: -71.4593,
+        town: "Weirs Beach",
+        services: ["restaurant", "shipsstore"],
+        phone: "",
+        season: "May–Oct",
+        note: "Mainland dock for the M/S Mount Washington sightseeing boat.",
+      },
+      {
+        name: "Christmas Island Marina",
+        lat: 43.5493922, lng: -71.4626949,
+        town: "Lakeport (Laconia)",
+        services: ["gas", "diesel", "pumpout", "slips", "moorings", "service", "parts", "storage"],
+        phone: "",
+        season: "Year-round (fuel in season)",
+        note: "65 Gold St, Lakeport. Full fuel and pump-out.",
+      },
+      {
+        name: "Paugus Bay Marina",
+        lat: 43.5683, lng: -71.4398,
+        town: "Laconia (Paugus Bay)",
+        services: ["gas", "diesel", "slips", "moorings", "service", "storage"],
+        phone: "",
+        season: "May–Oct (storage year-round)",
+        note: "Paugus Bay side of Laconia.",
+      },
+
+      // ----- Alton Bay (southern tip) -----
+      {
+        name: "Alton Bay Marina",
+        lat: 43.4710, lng: -71.2338,
+        town: "Alton Bay",
+        services: ["gas", "diesel", "pumpout", "slips", "moorings", "service", "parts", "storage", "ice"],
+        phone: "",
+        season: "May–Oct (storage year-round)",
+        note: "Inside the bay — easy fuel stop for boats running to/from Winni from the south.",
+      },
+      {
+        name: "Downing's Landing / Gas Dock",
+        lat: 43.470804, lng: -71.2336994,
+        town: "Alton Bay",
+        services: ["gas", "ice"],
+        phone: "",
+        season: "May–Oct",
+        note: "Walk-up gas dock near the public launch.",
+      },
+      {
+        name: "West Alton Marina",
+        lat: 43.542982, lng: -71.297794,
+        town: "West Alton",
+        services: ["gas", "diesel", "pumpout", "slips", "storage", "service"],
+        phone: "",
+        season: "Year-round (24/7 access)",
+        note: "Rt 11 & 11A. Advertised 24/7 access — useful for off-hours fuel.",
+      },
+      {
+        name: "Roberts Cove Marina",
+        lat: 43.5285052, lng: -71.2140153,
+        town: "Alton",
+        services: ["slips", "moorings", "ice", "restaurant"],
+        phone: "",
+        season: "May–Oct",
+        note: "28 Basin Rd. Cash only per the launch sign; ice cream + restrooms.",
+      },
+
+      // ----- Wolfeboro Bay (additional) -----
+      {
+        name: "Kingswood Yacht Club area moorings",
+        lat: 43.5735, lng: -71.2150,
+        town: "Wolfeboro",
+        services: ["moorings", "slips"],
+        phone: "",
+        season: "May–Oct",
+        note: "Moorings field just off Goodhue & Hawkins.",
+      },
+
+      // ----- Tuftonboro (north shore) -----
+      {
+        name: "Tuftonboro / Melvin Bay moorings",
+        lat: 43.6670, lng: -71.3180,
+        town: "Tuftonboro",
+        services: ["moorings"],
+        phone: "",
+        season: "May–Oct",
+        note: "Public mooring area; limited services. Hail or radio ahead.",
+      },
+
+      // ----- Gilmanton / Smith River (south-west) -----
+      {
+        name: "East Coast Flightcraft Marine",
+        lat: 43.5045, lng: -71.3030,
+        town: "Alton (south-west shore)",
+        services: ["storage", "service", "repairs"],
+        phone: "",
+        season: "Year-round",
+        note: "Inside storage; service & repairs off-season.",
+      },
+
+      // ----- Moultonborough (north-west) -----
+      {
+        name: "Moultonborough Marina",
+        lat: 43.6720, lng: -71.3320,
+        town: "Moultonborough",
+        services: ["gas", "diesel", "pumpout", "slips", "moorings", "service", "storage"],
+        phone: "",
+        season: "May–Oct (storage year-round)",
+        note: "Long-time Winni marina on the north-west shore.",
+      },
+
+      // ----- Center Harbor / "The Neck" area -----
+      {
+        name: "Hesky Park Marina Annex (Meredith)",
+        lat: 43.6582, lng: -71.4987,
+        town: "Meredith",
+        services: ["gas", "pumpout", "ice"],
+        phone: "",
+        season: "May–Oct",
+        note: "Walk-up gas + pump-out near Hesky Park; dock for transient boats.",
+      },
+    ];
+
     // ----- App state -----
     let map;
     let watchId = null;
@@ -485,6 +809,7 @@
       islands: null,
       hazards: null,
       launches: null,
+      marinas: null,       // static marina / fuel-dock layer
       buoys: null,
       trips: null,
       depths: null,        // crowdsourced soundings
@@ -557,6 +882,10 @@
         );
       });
       layers.launches.addTo(map);
+
+      layers.marinas = L.layerGroup();
+      MARINAS.forEach(m => addMarinaToLayer(m));
+      layers.marinas.addTo(map);
 
       layers.buoys = L.layerGroup();
       storedBuoys.forEach(b => addBuoyToLayer(b));
@@ -812,6 +1141,88 @@
         console.warn('NH GRANIT bathy fetch failed:', e);
         return { source: 'error', error: e.message };
       }
+    }
+
+    // ----- Marina static-layer rendering -----
+    function marinaHoursRowHTML(label, value) {
+      if (!value) return `<tr><td>${label}</td><td><em style="color:#999;">—</em></td></tr>`;
+      return `<tr class="${weekdayIsToday(label) ? 'today' : ''}"><td>${label}</td><td>${escapeHtml(value)}</td></tr>`;
+    }
+
+    function weekdayIsToday(short) {
+      // Map 3-letter day code to JS getDay() index. Compare local UTC date
+      // since this is advisory.
+      const jsDays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const today = new Date();
+      return jsDays[today.getDay()] === short;
+    }
+
+    function marinaPopupHTML(m) {
+      // Services chips
+      const chips = (m.services || [])
+        .map(s => MARINA_SERVICES[s])
+        .filter(Boolean)
+        .map(s => `<span class="marina-chip ${s.cls}">${s.label}</span>`)
+        .join('');
+      // Hours
+      const dayOrder = [
+        ['mon','Mon'], ['tue','Tue'], ['wed','Wed'],
+        ['thu','Thu'], ['fri','Fri'], ['sat','Sat'], ['sun','Sun'],
+      ];
+      const hoursRows = m.hours ? dayOrder.map(([k, lbl]) =>
+        marinaHoursRowHTML(lbl, m.hours[k])
+      ).join('') : '';
+      const hoursTable = hoursRows
+        ? `<table class="marina-hours"><tbody>${hoursRows}</tbody></table>`
+        : '';
+      const seasonLine = m.season
+        ? `<div style="font-size:11px;color:#555;margin-top:4px;">Season: <strong>${escapeHtml(m.season)}</strong></div>`
+        : '';
+      // Phone — use tel: link, only render if present
+      const phoneLine = m.phone
+        ? `<a class="call-btn" href="tel:${m.phone.replace(/[^0-9+]/g,'')}">📞 ${escapeHtml(m.phone)}</a>`
+        : '';
+      // Route to here — opens native maps with directions from current map center
+      // Fall back to current GPS if available; otherwise just destination pin
+      const dest = `${m.lat},${m.lng}`;
+      const routeBtn = `<a class="route-btn" target="_blank" rel="noopener" `
+        + `href="https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving">🧭 Route to here</a>`;
+      // Phone note if unverified
+      const phoneNote = m.phone
+        ? ''
+        : `<div style="font-size:11px;color:#888;margin-top:4px;font-style:italic;">Phone not verified — call directory assistance or check marina signage on arrival.</div>`;
+      return `
+        <strong style="font-size:14px;">${escapeHtml(m.name)}</strong>${m.town ? ` <small style="color:#888;">· ${escapeHtml(m.town)}</small>` : ''}<br>
+        ${chips ? `<div class="marina-chips">${chips}</div>` : ''}
+        ${m.note ? `<div style="font-size:12px;color:#333;margin:4px 0;">${escapeHtml(m.note)}</div>` : ''}
+        ${seasonLine}
+        ${hoursTable}
+        <div class="marina-actions">
+          ${routeBtn}
+          ${phoneLine}
+        </div>
+        ${phoneNote}
+      `;
+    }
+
+    function marinaIcon() {
+      return L.divIcon({
+        className: '',
+        html: '<div class="marina-icon"><span>⚓</span></div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+      });
+    }
+
+    function addMarinaToLayer(m) {
+      L.marker([m.lat, m.lng], { icon: marinaIcon(), title: m.name })
+        .addTo(layers.marinas)
+        .bindPopup(marinaPopupHTML(m));
+    }
+
+    function rebuildMarinaLayer() {
+      layers.marinas.clearLayers();
+      MARINAS.forEach(m => addMarinaToLayer(m));
     }
 
     function addBuoyToLayer(b) {
@@ -1544,9 +1955,10 @@ ${tracks}
           <p><strong>Recreation aid — not for primary navigation.</strong></p>
           <p>Always defer to official charts, visual markers, NH Marine Patrol buoys, and the Bizer chart.</p>
           <p style="font-size:12px;color:#666;">
-            Layers: buoys (community-contributed), hazards (community-contributed), public launches, past trips, crowdsourced depth soundings, and NH GRANIT bathymetry (reference only).<br>
-            Data sources: Roche Realty launch list, NH GRANIT/NHDES bathymetry, OpenStreetMap base map.<br>
+            Layers: buoys (community-contributed), hazards (community-contributed), public launches, marinas & fuel docks, past trips, crowdsourced depth soundings, and NH GRANIT bathymetry (reference only).<br>
+            Data sources: Roche Realty launch list, NH GRANIT/NHDES bathymetry, Lake Winnipesaukee marina directory (reference), OpenStreetMap base map.<br>
             Tap 📍 then tap the map to add a buoy, hazard, or depth sounding — pick which in the popup.<br>
+            Tap a ⚓ marina marker for hours, services, “Route to here”, and (when added) a phone link.<br>
             Tap 🛶 to view, rename, export (GPX), or delete past trips.<br>
             Trips auto-record while GPS is on and auto-save when you stop.
           </p>
@@ -1555,6 +1967,7 @@ ${tracks}
             <strong>Hazards saved locally:</strong> ${storedHazards.length}<br>
             <strong>Trips saved locally:</strong> ${storedTrips.length}<br>
             <strong>Depth soundings saved locally:</strong> ${storedDepths.length}<br>
+            <strong>Marinas in directory:</strong> ${MARINAS.length} (static reference data).<br>
             Use 💾 to export your data as JSON, or 🛶 to export trips as GPX.
           </p>
         `;
@@ -1569,6 +1982,10 @@ ${tracks}
       document.getElementById('layerLaunches').addEventListener('change', e => {
         if (e.target.checked) layers.launches.addTo(map);
         else map.removeLayer(layers.launches);
+      });
+      document.getElementById('layerMarinas').addEventListener('change', e => {
+        if (e.target.checked) layers.marinas.addTo(map);
+        else map.removeLayer(layers.marinas);
       });
       document.getElementById('layerHazards').addEventListener('change', e => {
         if (e.target.checked) layers.hazards.addTo(map);
