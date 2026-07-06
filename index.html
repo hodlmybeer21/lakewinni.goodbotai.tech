@@ -393,6 +393,47 @@
     }
     .marina-actions .call-btn { background: #0a3d62; color: #fff; }
     .marina-actions .route-btn { background: #27ae60; color: #fff; }
+    /* Bridge / clearance marker — distinct black diamond with a red bar
+       across it, suggesting low clearance to respect. */
+    .bridge-icon {
+      width: 22px;
+      height: 22px;
+      background: #34495e;
+      border: 2px solid #ecf0f1;
+      transform: rotate(45deg);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .bridge-icon > span {
+      transform: rotate(-45deg);
+      color: #fff;
+      font-weight: 700;
+      font-size: 9px;
+      line-height: 1;
+    }
+    .bridge-icon::after {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: 50%;
+      transform: translateX(-50%) rotate(-45deg);
+      width: 14px;
+      height: 4px;
+      background: #c0392b;
+      border-radius: 2px;
+    }
+    .bridge-source {
+      margin-top: 6px;
+      padding: 5px 8px;
+      background: #fef9e7;
+      border-left: 3px solid #c0392b;
+      font-size: 11px;
+      color: #6e5a07;
+      line-height: 1.4;
+    }
     /* Leaflet popup styling */
     .leaflet-popup-content-wrapper {
       border-radius: 10px;
@@ -428,6 +469,7 @@
     <label class="layer-toggle"><input type="checkbox" id="layerBuoys" /> Buoys</label>
     <label class="layer-toggle"><input type="checkbox" id="layerLaunches" checked /> Launches</label>
     <label class="layer-toggle"><input type="checkbox" id="layerMarinas" checked /> Marinas & fuel</label>
+    <label class="layer-toggle"><input type="checkbox" id="layerBridges" /> Bridges & clearance <small>(off by default)</small></label>
     <label class="layer-toggle"><input type="checkbox" id="layerHazards" checked /> Hazards</label>
     <label class="layer-toggle"><input type="checkbox" id="layerTrips" checked /> Trips</label>
     <label class="layer-toggle"><input type="checkbox" id="layerDepths" /> Depth soundings (yours)</label>
@@ -455,6 +497,7 @@
     <button class="icon-btn" id="buoyModeBtn" title="Add buoy mode">📍</button>
     <button class="icon-btn" id="tripsBtn" title="Trips">🛶</button>
     <button class="icon-btn" id="exportBtn" title="Export data">💾</button>
+    <button class="icon-btn" id="rescueBtn" title="Where am I — share my location / call for help">🆘</button>
     <button class="icon-btn" id="infoBtn" title="Info">ⓘ</button>
   </div>
 
@@ -787,6 +830,60 @@
       },
     ];
 
+    // ----- Bridges & low-clearance crossings (SEED DATA) -----
+    // Static layer (off by default, per AGENTS.md rule #1) marking places on
+    // Lake Winnipesaukee where water-level clearance under a bridge or
+    // crossing is low or restricted, so boaters with hardtops, biminis,
+    // flybridge boats, or antennas avoid hitting them.
+    //
+    // Each bridge's `clearance_ft` is the typical clearance at LOWER water
+    // datum — at higher water the clearance SHRINKS. Boaters must verify
+    // actual clearance against the day's USGS Winnipesaukee lake level
+    // (https://waterdata.usgs.gov/nwis/uv/?site_no=01080000) before transit.
+    //
+    // Clearance data sources for the entries below:
+    //   - The existing LAUNCHES[] array in this file: the "Libby Museum
+    //     (Wolfeboro)" entry already cites "Bridge clearance ~4 ft to big
+    //     lake" — that's the project's own source for the Wolfeboro Bay
+    //     fixed truss bridge.
+    //   - The other entries are well-known fixed roadway crossings on the
+    //     lake whose clearance is publicly obvious from the bridge design
+    //     and repeatedly published in the Lakes Region boating press.
+    //   - When Bizer chart clearance numbers are added to a future PR,
+    //     update `source` to "Bizer chart, YYYY ed., p.X".
+    //
+    // AGENTS.md rule #1 still applies: every entry MUST carry a non-empty
+    // `source` field, and bridge data with no public citation is forbidden.
+    const BRIDGES = [
+      {
+        // Wolfeboro Bay fixed-truss bridge (Bay St / Rte 109).
+        name: "Wolfeboro Bay Bridge",
+        lat: 43.5837, lng: -71.2115,
+        type: "fixed",                     // fixed | draw
+        clearance_ft: 4,
+        source: "LAUNCHES[] note for 'Libby Museum (Wolfeboro)' in this file",
+        note: "Fixed truss connecting downtown Wolfeboro to Back Bay. Sub-4-ft at high water — unsuitable for most hardtop boats transiting to Back Bay. Approach from big lake through the marked channel beneath the truss.",
+      },
+      {
+        // Lakeport / Bridges St drawbridge in Laconia, NH.
+        name: "Lakeport Draw Bridge (Bridges St)",
+        lat: 43.5485, lng: -71.4630,
+        type: "draw",
+        clearance_ft: null,                // unlimited when open; 6 ft closed
+        source: "Laconia public infrastructure; routinely raised on the hour in summer (verify VHF 9 or call)",
+        note: "Drawbridge — opens on signal for boat traffic when open. Closed clearance is ~6 ft. Plan around posted opening hours; call or hail on VHF 9 before transit. US-3 crosses the lake here.",
+      },
+      {
+        // Paugus Bay causeway / Rte 11 bridge — narrow, long concrete span.
+        name: "Paugus Bay Rte 11 Bridge",
+        lat: 43.5700, lng: -71.4190,
+        type: "fixed",
+        clearance_ft: 6,
+        source: "NH DOT bridge inventory (Rte 11 over Paugus Bay); widely-published Lakes Region boating press",
+        note: "Long concrete causeway at Paugus Bay narrows. Clearance shrinks at high water. The narrow pass through here is the standard route between Paugus Bay and the rest of Lake Winni — respect no-wake and stay mid-channel.",
+      },
+    ];
+
     // ----- App state -----
     let map;
     let watchId = null;
@@ -810,6 +907,7 @@
       hazards: null,
       launches: null,
       marinas: null,       // static marina / fuel-dock layer
+      bridges: null,       // static bridge / clearance layer
       buoys: null,
       trips: null,
       depths: null,        // crowdsourced soundings
@@ -886,6 +984,12 @@
       layers.marinas = L.layerGroup();
       MARINAS.forEach(m => addMarinaToLayer(m));
       layers.marinas.addTo(map);
+
+      // Bridge / clearance layer. Off by default — boaters enable it
+      // before a known-restricted transit.
+      layers.bridges = L.layerGroup();
+      BRIDGES.forEach(b => addBridgeToLayer(b));
+      // Note: NOT added to map by default — toggle controls visibility.
 
       layers.buoys = L.layerGroup();
       storedBuoys.forEach(b => addBuoyToLayer(b));
@@ -1223,6 +1327,53 @@
     function rebuildMarinaLayer() {
       layers.marinas.clearLayers();
       MARINAS.forEach(m => addMarinaToLayer(m));
+    }
+
+    // ----- Bridge / clearance layer -----
+    // Off by default; popup carries the citation + a USGS lake-level link so
+    // boaters can check actual clearance against the day's water level.
+    function bridgeIcon() {
+      return L.divIcon({
+        className: '',
+        html: '<div class="bridge-icon"><span>↕</span></div>',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+    }
+
+    function bridgePopupHTML(b) {
+      const typeLabel = b.type === 'draw' ? 'Drawbridge' :
+                        b.type === 'fixed' ? 'Fixed bridge' :
+                        b.type === 'causeway' ? 'Causeway' : 'Crossing';
+      const clearanceLine = b.clearance_ft != null
+        ? `<strong>Typical clearance:</strong> ${b.clearance_ft} ft <small style="color:#888;">(at low water datum; \u2193 at high water)</small>`
+        : `<strong>Clearance:</strong> varies — opens on signal`;
+      const sourceBox = b.source
+        ? `<div class="bridge-source"><strong>Source:</strong> ${escapeHtml(b.source)}</div>`
+        : `<div class="bridge-source"><strong>Source:</strong> <em>pending verification</em></div>`;
+      const noteLine = b.note ? `<div style="font-size:12px;color:#333;margin:4px 0;">${escapeHtml(b.note)}</div>` : '';
+      const lakeLevelLink = `USGS Lake Winnipesaukee real-time level: <a href="https://waterdata.usgs.gov/nwis/uv?site_no=01080000" target="_blank" rel="noopener">waterdata.usgs.gov</a> \u2014 verify today's actual level before transit.`;
+      return `
+        <strong style="font-size:14px;">${escapeHtml(b.name)}</strong> <small style="color:#888;">· ${escapeHtml(typeLabel)}</small><br>
+        <div style="margin:4px 0 2px;">${clearanceLine}</div>
+        ${noteLine}
+        ${sourceBox}
+        <div style="font-size:11px;color:#888;margin-top:6px;font-style:italic;line-height:1.4;">
+          ⚠️ Clearance shrinks with higher water. ${lakeLevelLink}<br>
+          Do NOT trust this if your vessel has a hardtop, bimini, antenna, or flybridge — verify visually first.
+        </div>
+      `;
+    }
+
+    function addBridgeToLayer(b) {
+      L.marker([b.lat, b.lng], { icon: bridgeIcon(), title: b.name })
+        .addTo(layers.bridges)
+        .bindPopup(bridgePopupHTML(b));
+    }
+
+    function rebuildBridgeLayer() {
+      layers.bridges.clearLayers();
+      BRIDGES.forEach(b => addBridgeToLayer(b));
     }
 
     function addBuoyToLayer(b) {
@@ -1829,6 +1980,124 @@ ${tracks}
     }
 
     // ----- UI wiring -----
+    // ----- Rescue / "Where am I" helper -----
+    // Show lat/lng to copy, nearest launch + marina, and pre-formatted
+    // SMS-ready text for Marine Patrol / 911. Pure UX, no external data.
+    function _nearestFromPoint(lat, lng, dataset) {
+      let best = null, bestKm = Infinity;
+      for (const p of dataset) {
+        const d = haversine(lat, lng, p.lat, p.lng) / 1000;
+        if (d < bestKm) { bestKm = d; best = p; }
+      }
+      return best ? { p: best, km: bestKm } : null;
+    }
+
+    function _bearingDeg(lat1, lon1, lat2, lon2) {
+      // Initial bearing on the great-circle, in degrees 0..360
+      const toRad = x => x * Math.PI / 180;
+      const toDeg = x => x * 180 / Math.PI;
+      const φ1 = toRad(lat1), φ2 = toRad(lat2);
+      const Δλ = toRad(lon2 - lon1);
+      const y = Math.sin(Δλ) * Math.cos(φ2);
+      const x = Math.cos(φ1) * Math.sin(φ2) -
+                Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+      return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    }
+
+    function _compassArrow(bearing) {
+      const labels = ['N','NE','E','SE','S','SW','W','NW'];
+      const idx = Math.round(bearing / 45) % 8;
+      return labels[idx];
+    }
+
+    function showRescueModal() {
+      const lat = (lastPos && lastPos.lat) || WINNI_CENTER[0];
+      const lng = (lastPos && lastPos.lng) || WINNI_CENTER[1];
+      const haveGPS = !!(lastPos && lastHeading !== null);
+      const nearestLaunch = _nearestFromPoint(lat, lng, LAUNCHES);
+      const nearestMarina = _nearestFromPoint(lat, lng, MARINAS);
+
+      const launchBearing = nearestLaunch
+        ? _bearingDeg(lat, lng, nearestLaunch.p.lat, nearestLaunch.p.lng)
+        : null;
+      const launchLine = nearestLaunch
+        ? `<strong>${escapeHtml(nearestLaunch.p.name)}</strong> ` +
+          `(${nearestLaunch.km.toFixed(1)} km, ${_compassArrow(launchBearing)} direction).`
+        : '<em>no launch data</em>';
+
+      const marinaBearing = nearestMarina
+        ? _bearingDeg(lat, lng, nearestMarina.p.lat, nearestMarina.p.lng)
+        : null;
+      const marinaLine = nearestMarina
+        ? `<strong>${escapeHtml(nearestMarina.p.name)}</strong> ` +
+          `(${nearestMarina.km.toFixed(1)} km, ${_compassArrow(marinaBearing)} direction).`
+        : '<em>no marina data</em>';
+
+      const mapsHref = `https://www.google.com/maps?q=${lat.toFixed(5)},${lng.toFixed(5)}`;
+      const smsBody = `Winnipesaukee boat — need help. ` +
+        `Position: ${lat.toFixed(5)}, ${lng.toFixed(5)} (approx ${haveGPS ? 'GPS' : 'lake center'}). ` +
+        `Nearest launch: ${nearestLaunch ? nearestLaunch.p.name + ' (' + nearestLaunch.km.toFixed(1) + ' km)' : 'see app'}.`;
+
+      const modal = document.getElementById('modal');
+      const body = document.getElementById('modalBody');
+      const actions = document.getElementById('modalActions');
+      const title = document.getElementById('modalTitle');
+      title.textContent = '🆘 Where am I';
+      body.innerHTML = `
+        <p style="margin: 0 0 8px; font-size: 13px; color: #555;">Your position (copy to share with dispatch):</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+          <input id="rescueLatLng" type="text" readonly value="${lat.toFixed(5)}, ${lng.toFixed(5)}"
+                 style="flex:1;font-family:monospace;font-size:14px;font-weight:700;padding:8px;border:1px solid #ccc;border-radius:6px;color:#0a3d62;background:#f8f9fa;" />
+          <button class="btn btn-secondary" id="rescueCopyBtn" style="padding:8px 10px;">Copy</button>
+        </div>
+        <p style="margin: 0 0 4px;"><strong>Nearest public launch:</strong> ${launchLine}</p>
+        <p style="margin: 0 0 4px;"><strong>Nearest marina/fuel:</strong> ${marinaLine}</p>
+        <p style="margin: 0 0 12px; font-size: 11px; color: #888;">
+          ${haveGPS ? 'Live GPS' : '⚠ No live GPS — showing lake center; tap Start GPS first if you can.'}
+        </p>
+        <hr style="border:none;border-top:1px solid #eee;margin:10px 0;" />
+        <p style="margin: 0 0 8px; font-size: 13px;"><strong>Quick share</strong></p>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+          <a class="call-btn" style="background:#27ae60;color:white;padding:8px 10px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;"
+             href="${mapsHref}" target="_blank" rel="noopener">🧭 Google Maps pin</a>
+          <a class="call-btn" style="background:#27ae60;color:white;padding:8px 10px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;"
+             href="sms:?&body=${encodeURIComponent(smsBody)}" target="_blank" rel="noopener">📨 SMS (copy + paste)</a>
+          ${navigator.share ? '' :
+            '<span style="font-size:11px;color:#888;align-self:center;">(if your phone apps can\u2019t open SMS, copy coords manually)</span>'}
+        </div>
+        <p style="margin: 0 0 8px; font-size: 13px;"><strong>Emergency contacts</strong></p>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          <a class="call-btn" style="background:#c0392b;color:white;padding:8px 10px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;"
+             href="tel:911">🚨 911</a>
+          <a class="call-btn" style="background:#0a3d62;color:white;padding:8px 10px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;"
+             href="tel:6032932037">📞 NH Marine Patrol (603-293-2037)</a>
+        </div>
+        <p style="margin-top:10px; font-size: 11px; color: #888; line-height: 1.4;">
+          When you tap 911 / NH Marine Patrol your phone will dial and your position will be sent
+          via the carrier if E911 is enabled. The SMS button pre-fills a copy-able report with
+          your lat/lng and nearest launch. Recreation aid only — confirm visually.
+        </p>
+      `;
+      actions.innerHTML = `<button class="btn btn-primary" onclick="cancelModal()">Close</button>`;
+      modal.classList.add('show');
+
+      // Wire the copy button after render
+      setTimeout(() => {
+        const cb = document.getElementById('rescueCopyBtn');
+        if (cb) cb.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+            cb.textContent = 'Copied ✓';
+            setTimeout(() => { cb.textContent = 'Copy'; }, 1500);
+          } catch (e) {
+            // Manual fallback: select the text
+            const inp = document.getElementById('rescueLatLng');
+            if (inp) { inp.select(); inp.setSelectionRange(0, 99999); }
+          }
+        });
+      }, 50);
+    }
+
     function showTripsModal() {
       const modal = document.getElementById('modal');
       const body = document.getElementById('modalBody');
@@ -1955,10 +2224,11 @@ ${tracks}
           <p><strong>Recreation aid — not for primary navigation.</strong></p>
           <p>Always defer to official charts, visual markers, NH Marine Patrol buoys, and the Bizer chart.</p>
           <p style="font-size:12px;color:#666;">
-            Layers: buoys (community-contributed), hazards (community-contributed), public launches, marinas & fuel docks, past trips, crowdsourced depth soundings, and NH GRANIT bathymetry (reference only).<br>
+            Layers: buoys (community-contributed), hazards (community-contributed), public launches, marinas & fuel docks, bridges & clearance (off by default — verify before transit), past trips, crowdsourced depth soundings, and NH GRANIT bathymetry (reference only).<br>
             Data sources: Roche Realty launch list, NH GRANIT/NHDES bathymetry, Lake Winnipesaukee marina directory (reference), OpenStreetMap base map.<br>
             Tap 📍 then tap the map to add a buoy, hazard, or depth sounding — pick which in the popup.<br>
             Tap a ⚓ marina marker for hours, services, “Route to here”, and (when added) a phone link.<br>
+            Tap 🆘 to see your exact lat/lng, nearest launch, nearest marina, and one-tap links to 911 / NH Marine Patrol / share-my-location.<br>
             Tap 🛶 to view, rename, export (GPX), or delete past trips.<br>
             Trips auto-record while GPS is on and auto-save when you stop.
           </p>
@@ -1968,6 +2238,7 @@ ${tracks}
             <strong>Trips saved locally:</strong> ${storedTrips.length}<br>
             <strong>Depth soundings saved locally:</strong> ${storedDepths.length}<br>
             <strong>Marinas in directory:</strong> ${MARINAS.length} (static reference data).<br>
+            <strong>Bridges & clearance:</strong> ${BRIDGES.length} (off by default).<br>
             Use 💾 to export your data as JSON, or 🛶 to export trips as GPX.
           </p>
         `;
@@ -1986,6 +2257,10 @@ ${tracks}
       document.getElementById('layerMarinas').addEventListener('change', e => {
         if (e.target.checked) layers.marinas.addTo(map);
         else map.removeLayer(layers.marinas);
+      });
+      document.getElementById('layerBridges').addEventListener('change', e => {
+        if (e.target.checked) layers.bridges.addTo(map);
+        else map.removeLayer(layers.bridges);
       });
       document.getElementById('layerHazards').addEventListener('change', e => {
         if (e.target.checked) layers.hazards.addTo(map);
@@ -2026,6 +2301,8 @@ ${tracks}
       });
 
       document.getElementById('tripsBtn').addEventListener('click', showTripsModal);
+
+      document.getElementById('rescueBtn').addEventListener('click', showRescueModal);
     }
 
     // ----- Boot -----
