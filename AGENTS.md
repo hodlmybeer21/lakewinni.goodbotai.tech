@@ -145,6 +145,7 @@ cd /root/.openclaw/workspace/projects/winni-map && git status --short && git log
 
 ## Recent commit history (for context)
 
+- `a85040e` — Collapse layers panel into a chip by default
 - `2f3ec47` — Add Where-am-I rescue helper + Bridges & clearance layer
 - `5a3a21d` — Empty-commit wake after rollback to ce4d266 (reverts the seed-buoys scaffold)
 - `080923d` — Document seeded-buoy infrastructure in AGENTS.md (ROLLED BACK in 5a3a21d; retain commit for reflog)
@@ -167,7 +168,9 @@ cd /root/.openclaw/workspace/projects/winni-map && git status --short && git log
 
 2. **`appendTripPoint` is called from `onPos`, which is invoked by the GPS watcher.** Same hoisting rule applies to any helper called from `onPos`.
 
-3. **Leaflet `setRotationAngle`** is used for the user marker heading. It's a `leaflet-rotatedmarker`-style API; if you swap Leaflet versions, this might break. Pin Leaflet to 1.9.4 (already pinned via CDN).
+3. **Layers panel is collapsed by default with header/body split.** The DOM has `<div id="layers" class="hud collapsed">` containing `#layers-header` (the chip) and `#layers-body` (the body of checkboxes). The state is persisted in `localStorage.winniLayersOpen` (`'1'` / `'0'`); default-on-first-visit is collapsed. If you add a new layer checkbox, append it inside `#layers-body`, never outside — the chip-side header is click-only. Outside-tap close and Escape close are global listeners on `document`; if you add a new modal-style overlay that lives outside `#layers`, make sure it suppresses propagation on its own click or the panel will close mid-interaction.
+
+4. **Leaflet `setRotationAngle`** is used for the user marker heading. It's a `leaflet-rotatedmarker`-style API; if you swap Leaflet versions, this might break. Pin Leaflet to 1.9.4 (already pinned via CDN).
 
 4. **`modal` CSS class** — adding `.show` shows it; removing hides. The depth-soundings modal prompt reuses the same modal element. Don't introduce a second modal.
 
