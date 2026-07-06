@@ -13,7 +13,7 @@ A single-file static web app (`index.html`, ~93 KB) that gives Winnipesaukee boa
 | -------- | -------------------------------------------------------------------- |
 | Project  | Winni Nav                                                            |
 | Owner    | Tyler (`HodlMyBeer12`, telegram 8511611117)                          |
-| Repo     | `github.com/hodlmybeer21/lakewinnie.goodbotai.tech`                  |
+| Repo     | `github.com/hodlmybeer21/lakewinni.goodbotai.tech`                  |
 | Host     | Vercel (auto-deploy on push to `main`)                               |
 | URL      | https://lakewinni.goodbotai.tech                                    |
 | Build    | None — single static `index.html`, served as-is                      |
