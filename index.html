@@ -167,11 +167,59 @@
       right: 16px;
       background: rgba(10,61,98,0.92);
       border-radius: 12px;
-      padding: 10px 12px;
+      padding: 0;             /* padding lives on the inner parts */
       box-shadow: 0 4px 12px rgba(0,0,0,0.35);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
-      min-width: 160px;
+      min-width: 200px;
+      max-width: calc(100vw - 32px);
+      overflow: hidden;
+      transition: max-height 0.22s ease, padding 0.22s ease;
+      max-height: 60vh;
+    }
+    /* Collapsed state: only the header chip is visible. */
+    #layers.collapsed {
+      max-height: 38px;
+    }
+    /* When collapsed, hide the body entirely and trim the shadow so
+       it reads as a small chip, not a panel. */
+    #layers.collapsed #layers-body {
+      display: none;
+    }
+    #layers.collapsed #layers-header {
+      border-bottom: none;
+    }
+    /* Mobile: layers panel hugs the right edge a touch tighter */
+    @media (max-width: 600px) {
+      #layers { right: 8px; min-width: 0; }
+      #layers-header { padding: 8px 12px; font-size: 13px; }
+    }
+    #layers-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    #layers-header .chevron {
+      font-size: 12px;
+      opacity: 0.7;
+      transition: transform 0.2s ease;
+      display: inline-block;
+    }
+    #layers.collapsed #layers-header .chevron {
+      transform: rotate(-90deg);
+    }
+    #layers-body {
+      padding: 6px 12px 10px 12px;
+      max-height: 60vh;
+      overflow-y: auto;
     }
     .layer-toggle {
       display: flex;
@@ -465,15 +513,21 @@
   <div id="buoyBanner" class="hud">📍 Tap the map to place a buoy or hazard</div>
   <div id="bathyBanner" class="hud bathy-banner" style="display:none;">⚠️ NH Bathymetry — reference only, NOT for navigation.</div>
 
-  <div id="layers" class="hud">
-    <label class="layer-toggle"><input type="checkbox" id="layerBuoys" /> Buoys</label>
-    <label class="layer-toggle"><input type="checkbox" id="layerLaunches" checked /> Launches</label>
-    <label class="layer-toggle"><input type="checkbox" id="layerMarinas" checked /> Marinas & fuel</label>
-    <label class="layer-toggle"><input type="checkbox" id="layerBridges" /> Bridges & clearance <small>(off by default)</small></label>
-    <label class="layer-toggle"><input type="checkbox" id="layerHazards" checked /> Hazards</label>
-    <label class="layer-toggle"><input type="checkbox" id="layerTrips" checked /> Trips</label>
-    <label class="layer-toggle"><input type="checkbox" id="layerDepths" /> Depth soundings (yours)</label>
-    <label class="layer-toggle"><input type="checkbox" id="layerBathy" /> NH Bathymetry <small>(ref.)</small></label>
+  <div id="layers" class="hud collapsed">
+    <div id="layers-header" title="Layers">
+      <span>Layers</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div id="layers-body">
+      <label class="layer-toggle"><input type="checkbox" id="layerBuoys" /> Buoys</label>
+      <label class="layer-toggle"><input type="checkbox" id="layerLaunches" checked /> Launches</label>
+      <label class="layer-toggle"><input type="checkbox" id="layerMarinas" checked /> Marinas &amp; fuel</label>
+      <label class="layer-toggle"><input type="checkbox" id="layerBridges" /> Bridges &amp; clearance <small>(off by default)</small></label>
+      <label class="layer-toggle"><input type="checkbox" id="layerHazards" checked /> Hazards</label>
+      <label class="layer-toggle"><input type="checkbox" id="layerTrips" checked /> Trips</label>
+      <label class="layer-toggle"><input type="checkbox" id="layerDepths" /> Depth soundings (yours)</label>
+      <label class="layer-toggle"><input type="checkbox" id="layerBathy" /> NH Bathymetry <small>(ref.)</small></label>
+    </div>
   </div>
 
   <div id="hudData" class="hud">
@@ -2190,6 +2244,50 @@ ${tracks}
         else stopTracking();
       });
 
+      // ----- Layers panel: collapsible, persisted, closes on outside-tap / Esc -----
+      const layersPanel = document.getElementById('layers');
+      const layersHeader = document.getElementById('layers-header');
+      const LAYERS_OPEN_KEY = 'winniLayersOpen';
+
+      function setLayersOpen(open) {
+        if (open) layersPanel.classList.remove('collapsed');
+        else layersPanel.classList.add('collapsed');
+        try { localStorage.setItem(LAYERS_OPEN_KEY, open ? '1' : '0'); } catch (e) {}
+      }
+
+      function getLayersOpen() {
+        try { return localStorage.getItem(LAYERS_OPEN_KEY) === '1'; }
+        catch (e) { return false; }
+      }
+
+      // Restore persisted state. Default = collapsed (first-time visitors
+      // see a clean map; returning users see their preferred state).
+      setLayersOpen(getLayersOpen());
+
+      if (layersHeader) {
+        layersHeader.addEventListener('click', e => {
+          // Don't toggle when tapping a checkbox inside the body — let the
+          // checkbox handle its own click. (Header is outside the body so
+          // this is mostly a guard for future state.)
+          e.preventDefault();
+          setLayersOpen(layersPanel.classList.contains('collapsed'));
+        });
+      }
+
+      // Outside-tap closes the panel (works only when open, so collapsed
+      // isn't blocked by an invisible panel eating clicks elsewhere).
+      document.addEventListener('click', e => {
+        if (layersPanel.classList.contains('collapsed')) return;
+        if (layersPanel.contains(e.target)) return;
+        setLayersOpen(false);
+      });
+
+      // Escape closes it.
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && !layersPanel.classList.contains('collapsed')) {
+          setLayersOpen(false);
+        }
+      });
       document.getElementById('recenterBtn').addEventListener('click', () => {
         if (userMarker) {
           map.setView(userMarker.getLatLng(), 15, { animate: true });
