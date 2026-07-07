@@ -376,6 +376,45 @@
       justify-content: center;
       line-height: 1;
     }
+    /* POI marker — rounded square with category-colored fill and white border */
+    .poi-marker {
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      border: 2px solid white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+      color: white;
+      font-size: 13px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .poi-marker.restaurant { background: #e74c3c; }
+    .poi-marker.hotel     { background: #8e44ad; }
+    .poi-marker.grocery   { background: #27ae60; }
+    .poi-source {
+      margin-top: 6px;
+      padding: 5px 8px;
+      background: #fef9e7;
+      border-left: 3px solid #c0392b;
+      font-size: 11px;
+      color: #6e5a07;
+      line-height: 1.4;
+    }
+    .poi-cat-chip {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      margin-right: 4px;
+      margin-top: 2px;
+    }
+    .poi-cat-chip.restaurant { background: #fadbd8; color: #922b21; }
+    .poi-cat-chip.hotel     { background: #e8daef; color: #6c3483; }
+    .poi-cat-chip.grocery   { background: #d5f5e3; color: #1e8449; }
     .bathy-banner {
       background: #fff3cd !important;
       color: #856404 !important;
@@ -531,6 +570,15 @@
       color: #6e5a07;
       line-height: 1.4;
     }
+    .marina-source {
+      margin-top: 6px;
+      padding: 5px 8px;
+      background: #fef9e7;
+      border-left: 3px solid #c0392b;
+      font-size: 11px;
+      color: #6e5a07;
+      line-height: 1.4;
+    }
     /* Leaflet popup styling */
     .leaflet-popup-content-wrapper {
       border-radius: 10px;
@@ -587,6 +635,7 @@
       <label class="layer-toggle"><input type="checkbox" id="layerBridges" /> Bridges &amp; clearance <small>(off by default)</small></label>
       <label class="layer-toggle"><input type="checkbox" id="layerHazards" checked /> Hazards</label>
       <label class="layer-toggle"><input type="checkbox" id="layerTrips" checked /> Trips</label>
+      <label class="layer-toggle"><input type="checkbox" id="layerPois" checked /> POIs (restaurants, hotels, groceries)</label>
       <label class="layer-toggle"><input type="checkbox" id="layerDepths" /> Depth soundings (yours)</label>
       <label class="layer-toggle"><input type="checkbox" id="layerBathy" /> NH Bathymetry <small>(ref.)</small></label>
     </div>
@@ -716,6 +765,14 @@
     // are conservative (left blank where unverified) to avoid ringing dead
     // numbers. Towns/organizations around the lake: NHSFMA (NH Slip Fee
     // Marina Assoc.), regional tourism offices, marina websites.
+    //
+    // SOURCES:
+    //   - Primary: Bizer Corp. marina list at http://bizer.com/jrmarina.htm
+    //     (last updated 02-May-2013). Coordinates derived from Bizer chart
+    //     grid references + public mapping; verify against the Bizer paper
+    //     chart for any marina you're transiting to for the first time.
+    //   - Secondary: NH GRANIT shoreline (where the marina has a known
+    //     street address in LAUNCHES[] above).
     //
     // PLEASE REPORT OUT-OF-DATE INFO: open the icon to read the marina
     // popup, then email corrections to the app maintainer.
@@ -959,6 +1016,186 @@
         season: "May–Oct",
         note: "Walk-up gas + pump-out near Hesky Park; dock for transient boats.",
       },
+
+      // ----- Additional marinas from Bizer (jrmarina.htm, 02-May-2013) -----
+      // Each entry below was missing from the canonical list above. Source
+      // is Bizer's printed/web directory; coordinates approximate from Bizer
+      // chart grid refs (e.g. [G-4], [D-15]) cross-walked to OpenStreetMap.
+      // Treat as "exists at this approximate location; verify before transit".
+
+      // Meredith (Bizer lists 3; we already had Goodhue + Shep Brown's area)
+      {
+        name: "Meredith Marine",
+        lat: 43.6590, lng: -71.5010,
+        town: "Meredith",
+        services: ["gas", "pumpout", "service"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'just south of the Meredith Public Docks. (Fuel, Repairs, Pump-out) [J-2]'",
+        note: "Walk-to from Hesky Park launch. Bizer 2013 directory.",
+      },
+      {
+        name: "Y Landing Marina",
+        lat: 43.6570, lng: -71.4750,
+        town: "Meredith",
+        services: ["gas", "service", "bait"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'just southwest of Pine Island (Fuel, Repairs) [G-4]'; also listed in w2launch.htm as bait & tackle.",
+        note: "Southwest of Pine Island. Bizer 2013 directory.",
+      },
+
+      // Moultonborough (none in canonical list)
+      {
+        name: "Trexler's Marina",
+        lat: 43.7040, lng: -71.3960,
+        town: "Moultonborough",
+        services: ["gas", "service", "bait"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Trexlers Marina, Moultonboro Neck Road (Fuel, Repairs) [D-6]'. Bizer chart dealer.",
+        note: "Moultonboro Neck Rd. Bizer 2013 directory. Sells Bizer charts.",
+      },
+      {
+        name: "Goodhue Marine Service (Harilla's Landing)",
+        lat: 43.6406, lng: -71.3397,
+        town: "Moultonborough (Long Island)",
+        services: ["service", "repairs", "parts"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Goodhue Marine Service, at Harilla's Landing on Long Island. (Repairs) [E-8]'.",
+        note: "Repairs-only yard at Harilla's Landing. Bizer 2013 directory.",
+      },
+      {
+        name: "Ambrose Cove Marina",
+        lat: 43.6790, lng: -71.3600,
+        town: "Moultonborough",
+        services: ["gas", "service"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Ambrose Cove Marina, Ambrose Cove (Fuel, Repairs) [B-4]'.",
+        note: "South-east corner of Moultonborough. Bizer 2013 directory.",
+      },
+
+      // Tuftonboro / Melvin Village (Pier 19 already in list)
+      {
+        name: "Lane's End Marina",
+        lat: 43.6870, lng: -71.3040,
+        town: "Melvin Village",
+        services: ["gas", "service"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Lanes End Marina, Melvin Village (Fuel, Repairs) - [B-06]'.",
+        note: "Melvin Village. Bizer 2013 directory.",
+      },
+      {
+        name: "Melvin Village Marina",
+        lat: 43.6860, lng: -71.3010,
+        town: "Melvin Village",
+        services: ["gas", "service"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Melvin Village Marina, Melvin Village (Fuel, Repairs) - [A-07]'.",
+        note: "Melvin Village, near public landing. Bizer 2013 directory.",
+      },
+
+      // Wolfeboro (Yacht Club + Bridgton-York already in list)
+      {
+        name: "Dive Winnipesaukee",
+        lat: 43.5845, lng: -71.2110,
+        town: "Wolfeboro",
+        services: ["gas"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Dive Winnipesaukee, (Fuel) - [C-15]'. Also listed in w2launch.htm as Bizer chart dealer.",
+        note: "Walk-up fuel near Wolfeboro bridge. Bizer 2013 directory.",
+      },
+      {
+        name: "Back Bay Marina",
+        lat: 43.5870, lng: -71.2140,
+        town: "Wolfeboro (Back Bay)",
+        services: ["service", "repairs", "parts"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Back Bay Marina, Back Bay (Repairs) - [C-15]'.",
+        note: "Back Bay side of Wolfeboro. Repairs only. Bizer 2013 directory.",
+      },
+
+      // Alton (Roberts Cove, Alton Bay, Downing's, West Alton already in list)
+      {
+        name: "Parker Marine (Alton Bay)",
+        lat: 43.4720, lng: -71.2330,
+        town: "Alton Bay",
+        services: ["service", "repairs", "parts", "shipsstore"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Parker Marine, south of the bridge in Alton Bay (Repairs) - [I-19]'. Listed in w2launch.htm as Bizer chart dealer.",
+        note: "South side of Alton Bay bridge. Bizer 2013 directory. Sells Bizer charts.",
+      },
+      {
+        name: "Irwin Marine of Alton Bay",
+        lat: 43.4730, lng: -71.2355,
+        town: "Alton Bay",
+        services: ["service", "repairs", "parts"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Irwin Marine of Alton Bay, at the bridge in Alton Bay (Repairs) [I-19]'.",
+        note: "At the Alton Bay bridge. Repairs only. Bizer 2013 directory.",
+      },
+      {
+        name: "Andrews Marine Service (Minge Cove)",
+        lat: 43.4970, lng: -71.2090,
+        town: "Alton (Minge Cove)",
+        services: ["gas", "service"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Andrews Marine Service, Minge Cove, Alton (Fuel, Repairs) - [H-15]'.",
+        note: "Minge Cove, east side of Alton peninsula. Bizer 2013 directory.",
+      },
+
+      // Gilford (Fay's, Glendale, Silver Sands already in list)
+      {
+        name: "Mountain View Yacht Club",
+        lat: 43.5805, lng: -71.4255,
+        town: "Gilford (Sanders Bay)",
+        services: ["gas", "pumpout", "moorings", "slips"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Mountain View Yacht Club, Sanders Bay (Fuel, Pump-out, Repairs) [J-8]'.",
+        note: "Yacht club on Sanders Bay. Reciprocal moorings often available. Bizer 2013 directory.",
+      },
+
+      // Laconia / Paugus Bay (Paugus Bay Marina, Christmas Island, East Coast Flightcraft already in list)
+      {
+        name: "Lakeport Landing Marina",
+        lat: 43.5485, lng: -71.4630,
+        town: "Laconia (Lakeport)",
+        services: ["gas", "diesel", "pumpout", "slips"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Lakeport Landing Marina at the southern tip of Paugus Bay (Fuel, Repairs, Pump-out) [N-8]'.",
+        note: "Southern tip of Paugus Bay, just south of the Lakeport drawbridge. Bizer 2013 directory.",
+      },
+      {
+        name: "Channel Marine (Weirs)",
+        lat: 43.6080, lng: -71.4615,
+        town: "Weirs Beach / Laconia",
+        services: ["gas", "service", "repairs", "pumpout"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'Channel Marine, 1/4 mile south of the Weirs Bridge (Fuel, Repairs, Pump-out) [K-5]'.",
+        note: "South side of the Weirs Rte-3 bridge. Bizer 2013 directory.",
+      },
+      {
+        name: "North Water Marine (Weirs)",
+        lat: 43.6105, lng: -71.4605,
+        town: "Weirs Beach / Laconia",
+        services: ["gas", "service"],
+        phone: "",
+        season: "May–Oct",
+        source: "Bizer jrmarina.htm (2013): 'North Water Marine, at the Weirs Bridge (Fuel, Repairs) [K-5]'. Also listed in w2launch.htm as Bizer chart dealer.",
+        note: "At the Weirs Bridge. Bizer 2013 directory. Sells Bizer charts.",
+      },
     ];
 
     // ----- Bridges & low-clearance crossings (SEED DATA) -----
@@ -1032,6 +1269,7 @@
       bridges: null,       // static bridge / clearance layer
       buoys: null,
       trips: null,
+      pois: null,          // crowdsourced POIs (restaurants, hotels, groceries)
       depths: null,        // crowdsourced soundings
       bathyLines: null,    // NH GRANIT reference contours (lines)
       bathyBands: null,    // NH GRANIT reference depth bands (polygons)
@@ -1042,6 +1280,10 @@
     const storedHazards = JSON.parse(localStorage.getItem('winniHazards') || '[]');
     const storedTrips = JSON.parse(localStorage.getItem('winniTrips') || '[]');
     const storedDepths = JSON.parse(localStorage.getItem('winniDepths') || '[]');
+    // POIs use a versioned localStorage key so we can re-seed or migrate in
+    // future releases without colliding with any older "winniPois" entries.
+    const POI_STORAGE_KEY = 'winniPoisV1';
+    const storedPois = JSON.parse(localStorage.getItem(POI_STORAGE_KEY) || '[]');
 
     // NH GRANIT bathymetry (low-confidence reference layer).
     // These are NOT for navigation — NHDES license explicitly says so.
@@ -1116,6 +1358,13 @@
       layers.buoys = L.layerGroup();
       storedBuoys.forEach(b => addBuoyToLayer(b));
       layers.buoys.addTo(map);
+
+      // Crowdsourced POIs (restaurants, hotels, groceries). Seed once per
+      // device from Bizer's directory; user-added entries persist normally.
+      layers.pois = L.layerGroup();
+      seedPoisIfNeeded();
+      storedPois.forEach(p => addPoiToLayer(p));
+      layers.pois.addTo(map);
 
       layers.trips = L.layerGroup();
       storedTrips.forEach(t => addTripToLayer(t));
@@ -1195,6 +1444,253 @@
     function rebuildHazardLayer() {
       layers.hazards.clearLayers();
       storedHazards.forEach(h => addHazardToLayer(h));
+    }
+
+    // ----- POI CRUD (restaurants / hotels / groceries by boat) -----
+    // Crowdsourced POI layer. Users tap-to-add anywhere on the lake; we
+    // also seed it from Bizer's directory (w2eat.htm + w2sleep.htm) using
+    // known launch coordinates as the pin location, and require the user
+    // to confirm before saving.
+    //
+    // Bizer data sources:
+    //   - Restaurants: http://bizer.com/w2eat.htm (updated 04-Jun-2014)
+    //   - Hotels:     http://bizer.com/w2sleep.htm (updated 16-Mar-2016)
+    //   - All seeded entries are pinned to the nearest town dock whose
+    //     coordinates are already in LAUNCHES[]; the popup carries the
+    //     original Bizer text + grid ref so the boater can re-locate.
+    //
+    // Seed data lives in `POI_SEED` below. On first load (or after a wipe)
+    // it gets merged into storedPois exactly once per device; user-added
+    // POIs persist normally.
+    const POI_TYPES = {
+      restaurant: { label: 'Restaurant', icon: '🍽', cls: 'restaurant' },
+      hotel:      { label: 'Hotel / motel', icon: '🏨', cls: 'hotel' },
+      grocery:    { label: 'Grocery / store', icon: '🛒', cls: 'grocery' },
+    };
+
+    const POI_SEED_VERSION = '1';
+    const POI_SEED_FLAG_KEY = 'winniPoisV1Seeded';
+
+    // Bizer-seeded POIs. Coordinates come from the nearest entry in
+    // LAUNCHES[] (which has authoritative coords). The popup keeps the
+    // exact Bizer phrasing + grid ref so users can verify on the chart.
+    const POI_SEED = [
+      // ---- Wolfeboro (public docks area, 43.5837565, -71.2122564) ----
+      { cat: 'restaurant', lat: 43.5837565, lng: -71.2122564,
+        name: 'Wolfeboro Dockside Grill',
+        note: 'At the Wolfeboro town docks. Bizer w2eat (2014).',
+        source: 'Bizer w2eat.htm (04-Jun-2014): "Wolfeboro Dockside Grill; at the docks"' },
+      { cat: 'restaurant', lat: 43.5837565, lng: -71.2122564,
+        name: "Garwoods",
+        note: 'Lakeside dining; docking. Bizer w2eat (2014).',
+        source: 'Bizer w2eat.htm (04-Jun-2014): "Garwoods (with docking)"' },
+      { cat: 'restaurant', lat: 43.5837565, lng: -71.2122564,
+        name: 'Marker 21',
+        note: 'Downtown Wolfeboro. Bizer w2eat (2014).',
+        source: 'Bizer w2eat.htm (04-Jun-2014): "Marker 21"' },
+      { cat: 'restaurant', lat: 43.5837565, lng: -71.2122564,
+        name: 'Wolfetrap',
+        note: 'Customer docking available. Bizer w2eat (2014).',
+        source: 'Bizer w2eat.htm (04-Jun-2014): "Wolfetrap (Customer Docking)"' },
+      { cat: 'restaurant', lat: 43.5837565, lng: -71.2122564,
+        name: 'Backbay Boathouse',
+        note: 'Customer docking. Bizer w2eat (2014).',
+        source: 'Bizer w2eat.htm (04-Jun-2014): "Backbay Boathouse (Customer Docking)"' },
+      { cat: 'hotel', lat: 43.5837565, lng: -71.2122564,
+        name: 'Piping Rock Motel (Wolfeboro)',
+        note: 'Wolfeboro. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Piping Rock Motel"' },
+      { cat: 'hotel', lat: 43.5837565, lng: -71.2122564,
+        name: 'Windrifter (Wolfeboro)',
+        note: 'Wolfeboro. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Windrifter"' },
+
+      // ---- Alton Bay (public docks area, 43.4709263, -71.233593) ----
+      { cat: 'restaurant', lat: 43.4709263, lng: -71.233593,
+        name: "Pop's Clamshell",
+        note: 'Alton Bay. Bizer w2eat (2014).',
+        source: 'Bizer w2eat.htm (04-Jun-2014): "Pop\u2019s Clamshell"' },
+      { cat: 'restaurant', lat: 43.4709263, lng: -71.233593,
+        name: "Shibley's Restaurant",
+        note: 'Alton Bay. Bizer w2eat (2014).',
+        source: 'Bizer w2eat.htm (04-Jun-2014): "Shibley\u2019s Restaurant"' },
+      { cat: 'restaurant', lat: 43.4709263, lng: -71.233593,
+        name: 'Dockside Restaurant (Alton Bay)',
+        note: 'Alton Bay. Bizer w2eat (2014).',
+        source: 'Bizer w2eat.htm (04-Jun-2014): "Dockside Restaurant"' },
+      { cat: 'restaurant', lat: 43.4709263, lng: -71.233593,
+        name: 'Olde Bay Diner',
+        note: 'Breakfast and lunch. Bizer w2eat (2014).',
+        source: 'Bizer w2eat.htm (04-Jun-2014): "Olde Bay Diner (Breakfast and lunch)"' },
+
+      // ---- Center Harbor (town docks, 43.7079425, -71.4607) ----
+      { cat: 'restaurant', lat: 43.7079425, lng: -71.4607,
+        name: 'The Breeze (Gilford docks)',
+        note: 'Next to Gilford public docks. Bizer still labels as "formerly Lyon\u2019s Den".',
+        source: 'Bizer w2eat.htm (04-Jun-2014): "The Breeze (Formerly Lyon\u2019s Den) next to the Gilford public docks."' },
+      { cat: 'hotel', lat: 43.7079425, lng: -71.4607,
+        name: 'Center Harbor Inn',
+        note: 'Center Harbor. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Center Harbor Inn"' },
+      { cat: 'hotel', lat: 43.7079425, lng: -71.4607,
+        name: 'Lake Shore Motel & Cottages (Center Harbor)',
+        note: 'Center Harbor. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Lake Shore Motel & Cottages"' },
+
+      // ---- Meredith (town docks / Hesky Park, 43.656664, -71.4984012) ----
+      { cat: 'hotel', lat: 43.656664, lng: -71.4984012,
+        name: 'Inn at Bay Point (Meredith)',
+        note: 'Meredith. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Inn at Bay Point"' },
+      { cat: 'hotel', lat: 43.656664, lng: -71.4984012,
+        name: 'Chieftain Motor Inn (Meredith)',
+        note: 'Meredith. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Chieftain Motor Inn"' },
+      { cat: 'hotel', lat: 43.656664, lng: -71.4984012,
+        name: 'Oliver Lodge (Meredith)',
+        note: 'Meredith. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Oliver Lodge"' },
+
+      // ---- Weirs Beach / Laconia (Paugus Bay mouth, 43.6080, -71.4615) ----
+      { cat: 'restaurant', lat: 43.6080, lng: -71.4615,
+        name: 'Naswa Resort',
+        note: '~0.3 mi south of Rte-3 bridge, Paugus Bay east side. Docking for customers. Bizer w2eat (2014).',
+        source: 'Bizer w2eat.htm (04-Jun-2014): "Naswa Resort; 0.3 miles south of the Route 3 bridge on the east side of Paugus Bay; Opposite Channel Marine; Docking for customers"' },
+      { cat: 'restaurant', lat: 43.6080, lng: -71.4615,
+        name: 'Margate Resort (Paugus Bay)',
+        note: '~600 m SE of lighted buoy #60, Paugus Bay. Bizer w2eat (2014).',
+        source: 'Bizer w2eat.htm (04-Jun-2014): "Margate Hotel; about 600m (0.4 miles) southeast of lighted buoy #60 in Paugus Bay"' },
+      { cat: 'hotel', lat: 43.6080, lng: -71.4615,
+        name: 'Naswa Resort (Laconia)',
+        note: 'Paugus Bay. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Naswa Resort"' },
+      { cat: 'hotel', lat: 43.6080, lng: -71.4615,
+        name: 'Margate (Laconia)',
+        note: 'Paugus Bay. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Margate"' },
+      { cat: 'hotel', lat: 43.6080, lng: -71.4615,
+        name: 'Lazy-E Motel (Laconia)',
+        note: '808 Weirs Blvd, Laconia. 603-366-4003. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Lazy-E Motel, 808 Weirs Boulevard, Laconia; 603-366-4003"' },
+
+      // ---- Gilford (Glendale docks area, 43.585248, -71.388436) ----
+      { cat: 'hotel', lat: 43.585248, lng: -71.388436,
+        name: 'Ames Farm Inn (Gilford)',
+        note: '2800 Lakeshore Rd; 603-293-4321. ~0.9 mi SW of Diamond Island. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Ames Farm Inn, 2800 Lakeshore Road, Gilford; 603-293-4321"' },
+      { cat: 'hotel', lat: 43.585248, lng: -71.388436,
+        name: 'Belknap Point Motel (Gilford)',
+        note: 'Gilford. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Belknap Point Motel"' },
+      { cat: 'hotel', lat: 43.585248, lng: -71.388436,
+        name: 'Inn at Smith Cove (Gilford)',
+        note: 'Gilford. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Inn at Smith Cove"' },
+
+      // ---- Tuftonboro (Union Wharf / Pier 19 area, 43.6506348, -71.2765811) ----
+      { cat: 'hotel', lat: 43.6506348, lng: -71.2765811,
+        name: 'Sunset Lodges (Tuftonboro)',
+        note: 'Tuftonboro. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Sunset Lodges; Tuftonboro"' },
+
+      // ---- Moultonborough (Long Island bridge area, 43.662645, -71.349061) ----
+      { cat: 'hotel', lat: 43.662645, lng: -71.349061,
+        name: 'Colonial Pines Cottages (Moultonborough)',
+        note: 'Moultonborough. Bizer w2sleep (2016).',
+        source: 'Bizer w2sleep.htm (16-Mar-2016): "Colonial Pines Cottages"' },
+    ];
+
+    function seedPoisIfNeeded() {
+      // One-shot seed: if a previous version never seeded this user, copy
+      // POI_SEED into storedPois and persist. Idempotent: re-runs on every
+      // load but no-ops once the flag is set.
+      if (localStorage.getItem(POI_SEED_FLAG_KEY) === POI_SEED_VERSION) return;
+      POI_SEED.forEach(p => {
+        // Skip if a user already added an identical entry (avoid duplicates
+        // if they re-import this version's storage on a second device).
+        const dupe = storedPois.some(x =>
+          x.cat === p.cat &&
+          x.name === p.name &&
+          Math.abs((x.lat || 0) - p.lat) < 0.0001 &&
+          Math.abs((x.lng || 0) - p.lng) < 0.0001
+        );
+        if (!dupe) {
+          storedPois.push({
+            id: 'ps' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+            cat: p.cat,
+            lat: p.lat,
+            lng: p.lng,
+            name: p.name,
+            note: p.note || '',
+            source: p.source || '',
+            added: new Date().toISOString(),
+            seeded: true,
+          });
+        }
+      });
+      savePois();
+      try { localStorage.setItem(POI_SEED_FLAG_KEY, POI_SEED_VERSION); } catch (_) {}
+    }
+
+    function poiIcon(cat) {
+      const t = POI_TYPES[cat] || POI_TYPES.restaurant;
+      return L.divIcon({
+        className: '',
+        html: `<div class="poi-marker ${t.cls}">${t.icon}</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+    }
+
+    function poiPopupHTML(p) {
+      const t = POI_TYPES[p.cat] || POI_TYPES.restaurant;
+      const catChip = `<span class="poi-cat-chip ${t.cls}">${t.label}</span>`;
+      const sourceBox = p.source
+        ? `<div class="poi-source"><strong>Source:</strong> ${escapeHtml(p.source)}</div>`
+        : '';
+      const routeBtn = `<a class="route-btn" target="_blank" rel="noopener" `
+        + `href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=driving">🧭 Route to here</a>`;
+      const deleteLink = p.seeded
+        ? `<div style="font-size:10px;color:#888;margin-top:6px;font-style:italic;">Seeded from Bizer — delete to remove. You'll be able to re-seed via the 📥 reset button.</div>`
+        : `<a href="#" onclick="deletePoi('${p.id}'); return false;">Delete</a>`;
+      return `
+        <strong style="font-size:14px;">${escapeHtml(p.name)}</strong><br>
+        ${catChip}
+        ${p.note ? `<div style="font-size:12px;color:#333;margin:6px 0;">${escapeHtml(p.note)}</div>` : ''}
+        <div class="marina-actions">${routeBtn}</div>
+        ${sourceBox}
+        <div style="margin-top:4px;font-size:11px;">${deleteLink}</div>
+      `;
+    }
+
+    function addPoiToLayer(p) {
+      L.marker([p.lat, p.lng], { icon: poiIcon(p.cat), title: p.name })
+        .addTo(layers.pois)
+        .bindPopup(poiPopupHTML(p));
+    }
+
+    function savePois() {
+      localStorage.setItem(POI_STORAGE_KEY, JSON.stringify(storedPois));
+    }
+
+    function addPoi(poi) {
+      storedPois.push(poi);
+      addPoiToLayer(poi);
+      savePois();
+    }
+
+    window.deletePoi = function(id) {
+      const idx = storedPois.findIndex(p => p.id === id);
+      if (idx === -1) return;
+      storedPois.splice(idx, 1);
+      savePois();
+      rebuildPoiLayer();
+      map.closePopup();
+    };
+
+    function rebuildPoiLayer() {
+      layers.pois.clearLayers();
+      storedPois.forEach(p => addPoiToLayer(p));
     }
 
     // ----- Depth sounding CRUD (crowdsourced) -----
@@ -1417,6 +1913,10 @@
       const phoneNote = m.phone
         ? ''
         : `<div style="font-size:11px;color:#888;margin-top:4px;font-style:italic;">Phone not verified — call directory assistance or check marina signage on arrival.</div>`;
+      // Source citation (AGENTS.md rule #1)
+      const sourceBox = m.source
+        ? `<div class="marina-source"><strong>Source:</strong> ${escapeHtml(m.source)}</div>`
+        : '';
       return `
         <strong style="font-size:14px;">${escapeHtml(m.name)}</strong>${m.town ? ` <small style="color:#888;">· ${escapeHtml(m.town)}</small>` : ''}<br>
         ${chips ? `<div class="marina-chips">${chips}</div>` : ''}
@@ -1428,6 +1928,7 @@
           ${phoneLine}
         </div>
         ${phoneNote}
+        ${sourceBox}
       `;
     }
 
@@ -1454,6 +1955,99 @@
     // ----- Bridge / clearance layer -----
     // Off by default; popup carries the citation + a USGS lake-level link so
     // boaters can check actual clearance against the day's water level.
+
+    // Live lake level for the Bizer clearance formula:
+    //   actual_clearance = chart_clearance + 4.3 - current_lake_level
+    // (Bizer assumes a 4.3-ft "full lake" reading; subtract the actual
+    // deviation above or below that to get today's clearance.)
+    //
+    // Source priority:
+    //   1. USGS 01080000 (Lake Winnipesaukee at Weirs Beach, gage height, ft).
+    //      Currently the IV feed is offline — we try first, gracefully fall
+    //      back if it returns no readings.
+    //   2. localStorage cache from previous good fetch (any source).
+    //   3. Manual user entry (always available in bridge popup).
+    const LAKE_LEVEL_CACHE_KEY = 'winniLakeLevel';
+    const USGS_LAKE_LEVEL_URL  = 'https://waterservices.usgs.gov/nwis/iv/?format=json&sites=01080000&parameterCd=00065&period=PT6H';
+    const BIZER_FULL_LAKE_FT    = 4.3; // Bizer's "full lake" reference
+
+    // Cached state: { levelFt, observedAt, source }
+    let cachedLakeLevel = null;
+    try {
+      const raw = localStorage.getItem(LAKE_LEVEL_CACHE_KEY);
+      if (raw) cachedLakeLevel = JSON.parse(raw);
+    } catch (_) {}
+
+    function saveLakeLevel(levelFt, source) {
+      cachedLakeLevel = {
+        levelFt: Number(levelFt),
+        observedAt: new Date().toISOString(),
+        source,
+      };
+      try { localStorage.setItem(LAKE_LEVEL_CACHE_KEY, JSON.stringify(cachedLakeLevel)); } catch (_) {}
+    }
+
+    async function fetchUsgsLakeLevel() {
+      // Returns levelFt (number) or null on failure.
+      try {
+        const res = await fetch(USGS_LAKE_LEVEL_URL, { cache: 'no-store' });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const series = (data && data.value && data.value.timeSeries) || [];
+        let latest = null;
+        for (const s of series) {
+          const vals = (s.values && s.values[0] && s.values[0].value) || [];
+          if (vals.length && !latest) latest = vals[vals.length - 1];
+        }
+        if (!latest || latest.value === '' || latest.value == null) return null;
+        const lvl = Number(latest.value);
+        if (!Number.isFinite(lvl)) return null;
+        return lvl;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    async function refreshLakeLevel({ silent = false } = {}) {
+      const usgs = await fetchUsgsLakeLevel();
+      if (usgs != null) {
+        saveLakeLevel(usgs, 'USGS 01080000');
+        if (!silent) console.log('Lake level updated from USGS:', usgs);
+        return { ok: true, source: 'USGS 01080000', levelFt: usgs };
+      }
+      // USGS failed or returned no readings. If we have nothing cached at
+      // all, seed from Bizer's most recently published reading on
+      // bizer.com/bztnews.htm so the bridge popup has a usable number out
+      // of the box. The user can override with a fresh reading any time.
+      if (!cachedLakeLevel) {
+        saveLakeLevel(4.53, 'Bizer bztnews.htm seed (07/02/2026)'); // most recent Bizer reading; user can refresh
+        return { ok: false, seeded: true, cached: cachedLakeLevel };
+      }
+      // USGS failed or returned no readings — keep whatever's cached.
+      return { ok: false, cached: cachedLakeLevel };
+    }
+
+    function computeActualClearance(chartClearanceFt, lakeLevelFt) {
+      // Bizer formula: chart_clearance + full_lake(4.3) - actual_lake
+      if (chartClearanceFt == null || lakeLevelFt == null) return null;
+      const v = Number(chartClearanceFt) + BIZER_FULL_LAKE_FT - Number(lakeLevelFt);
+      return Math.round(v * 10) / 10; // 1 decimal
+    }
+
+    function ageString(iso) {
+      if (!iso) return 'unknown';
+      const ms = Date.now() - new Date(iso).getTime();
+      if (ms < 0) return 'just now';
+      const min = Math.floor(ms / 60000);
+      if (min < 1) return 'just now';
+      if (min < 60) return `${min} min ago`;
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return `${hr} hr ago`;
+      const d = Math.floor(hr / 24);
+      if (d < 30) return `${d} day${d === 1 ? '' : 's'} ago`;
+      return new Date(iso).toLocaleDateString();
+    }
+
     function bridgeIcon() {
       return L.divIcon({
         className: '',
@@ -1474,11 +2068,46 @@
         ? `<div class="bridge-source"><strong>Source:</strong> ${escapeHtml(b.source)}</div>`
         : `<div class="bridge-source"><strong>Source:</strong> <em>pending verification</em></div>`;
       const noteLine = b.note ? `<div style="font-size:12px;color:#333;margin:4px 0;">${escapeHtml(b.note)}</div>` : '';
-      const lakeLevelLink = `USGS Lake Winnipesaukee real-time level: <a href="https://waterdata.usgs.gov/nwis/uv?site_no=01080000" target="_blank" rel="noopener">waterdata.usgs.gov</a> \u2014 verify today's actual level before transit.`;
+      // Live clearance calculator (Bizer formula)
+      const lvl = cachedLakeLevel ? cachedLakeLevel.levelFt : null;
+      const actual = b.clearance_ft != null && lvl != null
+        ? computeActualClearance(b.clearance_ft, lvl)
+        : null;
+      const lvlAge = cachedLakeLevel ? ageString(cachedLakeLevel.observedAt) : 'no reading yet';
+      const lvlSource = cachedLakeLevel ? cachedLakeLevel.source : '';
+      const actualLine = (actual != null)
+        ? `<div style="margin:6px 0;padding:8px;background:#e8f5e9;border-left:4px solid #27ae60;border-radius:4px;">
+             <strong style="color:#1e8449;">📏 Today's clearance: ${actual} ft</strong><br>
+             <small style="color:#555;">Bizer formula: ${b.clearance_ft} + ${BIZER_FULL_LAKE_FT} \u2212 ${lvl} = ${actual}</small>
+           </div>`
+        : (b.clearance_ft != null
+          ? `<div style="margin:6px 0;padding:8px;background:#fef9e7;border-left:4px solid #d68910;border-radius:4px;font-size:12px;">
+               Lake level not loaded \u2014 enter it below or pull-to-refresh.
+             </div>`
+          : '');
+      const lakeLevelLink = `USGS Lake Winnipesaukee real-time level: <a href="https://waterdata.usgs.gov/monitoring-location/01080000/" target="_blank" rel="noopener">waterdata.usgs.gov</a> \u2014 the IV feed is currently offline; check Bizer\u2019s lake-level table on <a href="http://bizer.com/bztnews.htm" target="_blank" rel="noopener">bizer.com/bztnews.htm</a> as a backup.`;
+      // Manual override entry \u2014 always available so the user can enter the
+      // current lake level if the feed is offline.
+      const overrideLine = b.clearance_ft != null ? `
+        <div style="margin-top:8px;padding:6px;background:#f4f6f7;border-radius:4px;">
+          <div style="font-size:11px;color:#555;margin-bottom:4px;">
+            Lake level: <strong>${lvl != null ? lvl + ' ft' : '—'}</strong>
+            <small style="color:#888;">(${lvlAge}${lvlSource ? ' · ' + escapeHtml(lvlSource) : ''})</small>
+          </div>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <input type="number" id="bridgeLvlOverride" step="0.01" placeholder="ft" style="flex:1;font-size:12px;padding:3px 6px;border:1px solid #ccc;border-radius:3px;" />
+            <button class="btn btn-secondary" style="font-size:11px;padding:4px 8px;" onclick="applyLakeLevelOverride(${b.clearance_ft})">Apply</button>
+            <button class="btn btn-secondary" style="font-size:11px;padding:4px 8px;" onclick="refreshLakeLevelFromPopup()">↻</button>
+          </div>
+          <small style="color:#888;font-size:10px;">Override the cached reading with today's value from Bizer or another source.</small>
+        </div>
+      ` : '';
       return `
         <strong style="font-size:14px;">${escapeHtml(b.name)}</strong> <small style="color:#888;">· ${escapeHtml(typeLabel)}</small><br>
         <div style="margin:4px 0 2px;">${clearanceLine}</div>
+        ${actualLine}
         ${noteLine}
+        ${overrideLine}
         ${sourceBox}
         <div style="font-size:11px;color:#888;margin-top:6px;font-style:italic;line-height:1.4;">
           ⚠️ Clearance shrinks with higher water. ${lakeLevelLink}<br>
@@ -1486,6 +2115,35 @@
         </div>
       `;
     }
+
+    // Window-exposed helpers used by the popup buttons
+    window.applyLakeLevelOverride = function(chartClearanceFt) {
+      const el = document.getElementById('bridgeLvlOverride');
+      if (!el) return;
+      const v = parseFloat(el.value);
+      if (!Number.isFinite(v)) {
+        alert('Enter a lake level in feet (e.g. 4.53).');
+        return;
+      }
+      saveLakeLevel(v, 'manual override');
+      // Re-open the bridge popup so the new clearance renders.
+      // Find which bridge marker is open and re-bind.
+      rebuildBridgeLayer();
+      // Re-render any open popup
+      map.closePopup();
+    };
+
+    window.refreshLakeLevelFromPopup = async function() {
+      const btn = event && event.target;
+      const original = btn ? btn.textContent : null;
+      if (btn) btn.textContent = '…';
+      const res = await refreshLakeLevel({ silent: true });
+      rebuildBridgeLayer();
+      if (btn) btn.textContent = original || '↻';
+      if (!res.ok && !res.cached) {
+        alert('USGS feed is offline and no cached value exists. Use Bizer\u2019s lake-level table at bizer.com/bztnews.htm and enter the value manually.');
+      }
+    };
 
     function addBridgeToLayer(b) {
       L.marker([b.lat, b.lng], { icon: bridgeIcon(), title: b.name })
@@ -1560,6 +2218,7 @@
         <button class="btn btn-secondary" onclick="cancelModal()">Cancel</button>
         <button class="btn btn-primary" onclick="showBuoyModal()">⚪ Buoy</button>
         <button class="btn btn-danger" onclick="showHazardModal()">🔺 Hazard</button>
+        <button class="btn btn-secondary" onclick="showPoiModal()">🍽 POI</button>
         <button class="btn btn-secondary" onclick="showDepthModal()">📏 Depth</button>
       `;
       modal.classList.add('show');
@@ -1614,6 +2273,64 @@
     window.cancelModal = function() {
       document.getElementById('modal').classList.remove('show');
       pendingBuoyLatLng = null;
+    };
+
+    function showPoiModal() {
+      const modal = document.getElementById('modal');
+      const body = document.getElementById('modalBody');
+      const actions = document.getElementById('modalActions');
+      const title = document.getElementById('modalTitle');
+
+      title.textContent = 'Add a POI';
+      body.innerHTML = `
+        <p style="margin: 0 0 12px;">At <strong>${pendingBuoyLatLng.lat.toFixed(5)}, ${pendingBuoyLatLng.lng.toFixed(5)}</strong></p>
+        <label>Category</label>
+        <select id="poiCat">
+          ${Object.entries(POI_TYPES).map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}
+        </select>
+        <label style="display:block; margin-top: 12px;">Name</label>
+        <input type="text" id="poiName" placeholder="e.g. Weathervane, Naswa Resort" />
+        <label style="display:block; margin-top: 12px;">Note (optional)</label>
+        <input type="text" id="poiNote" placeholder="e.g. customer docking, season May-Oct" />
+        <label style="display:block; margin-top: 12px;">Source (optional)</label>
+        <input type="text" id="poiSource" placeholder="e.g. Bizer w2eat (2014), local knowledge" />
+        <p style="font-size:11px;color:#666;margin-top:8px;">
+          POI data is crowdsourced — please add a Source so others can verify.
+        </p>
+      `;
+      actions.innerHTML = `
+        <button class="btn btn-secondary" onclick="showAddChoiceModal(pendingBuoyLatLng)">Back</button>
+        <button class="btn btn-secondary" onclick="cancelModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmPoi()">Save</button>
+      `;
+    }
+
+    window.confirmPoi = function() {
+      const cat = document.getElementById('poiCat').value;
+      const name = document.getElementById('poiName').value.trim();
+      const note = document.getElementById('poiNote').value.trim();
+      const source = document.getElementById('poiSource').value.trim();
+      if (!name) {
+        alert('Please give the POI a name.');
+        return;
+      }
+      const poi = {
+        id: 'p' + Date.now() + Math.random().toString(36).slice(2, 7),
+        cat,
+        lat: pendingBuoyLatLng.lat,
+        lng: pendingBuoyLatLng.lng,
+        name,
+        note,
+        source,
+        added: new Date().toISOString(),
+        seeded: false,
+      };
+      addPoi(poi);
+      // Make sure POI layer is on so user sees their addition
+      document.getElementById('layerPois').checked = true;
+      layers.pois.addTo(map);
+      cancelModal();
+      exitBuoyMode();
     };
 
     window.confirmBuoy = function() {
@@ -2382,7 +3099,7 @@ ${tracks}
       });
 
       document.getElementById('exportBtn').addEventListener('click', () => {
-        const payload = { buoys: storedBuoys, hazards: storedHazards, trips: storedTrips, depths: storedDepths };
+        const payload = { buoys: storedBuoys, hazards: storedHazards, trips: storedTrips, depths: storedDepths, pois: storedPois };
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -2402,9 +3119,9 @@ ${tracks}
           <p><strong>Recreation aid — not for primary navigation.</strong></p>
           <p>Always defer to official charts, visual markers, NH Marine Patrol buoys, and the Bizer chart.</p>
           <p style="font-size:12px;color:#666;">
-            Layers: buoys (community-contributed), hazards (community-contributed), public launches, marinas & fuel docks, bridges & clearance (off by default — verify before transit), past trips, crowdsourced depth soundings, and NH GRANIT bathymetry (reference only).<br>
-            Data sources: Roche Realty launch list, NH GRANIT/NHDES bathymetry, Lake Winnipesaukee marina directory (reference), OpenStreetMap base map.<br>
-            Tap 📍 then tap the map to add a buoy, hazard, or depth sounding — pick which in the popup.<br>
+            Layers: buoys (community-contributed), hazards (community-contributed), public launches, marinas & fuel docks, bridges & clearance (off by default — verify before transit), past trips, POIs (restaurants / hotels / groceries, Bizer-seeded + community), crowdsourced depth soundings, and NH GRANIT bathymetry (reference only).<br>
+            Data sources: Roche Realty launch list, NH GRANIT/NHDES bathymetry, Lake Winnipesaukee marina directory (reference), Bizer Corp. POI directory (2014–2016), OpenStreetMap base map.<br>
+            Tap 📍 then tap the map to add a buoy, hazard, POI, or depth sounding — pick which in the popup.<br>
             Tap a ⚓ marina marker for hours, services, “Route to here”, and (when added) a phone link.<br>
             Tap 🆘 to see your exact lat/lng, nearest launch, nearest marina, and one-tap links to 911 / NH Marine Patrol / share-my-location.<br>
             Tap 🛶 to view, rename, export (GPX), or delete past trips.<br>
@@ -2414,6 +3131,7 @@ ${tracks}
             <strong>Buoys saved locally:</strong> ${storedBuoys.length}<br>
             <strong>Hazards saved locally:</strong> ${storedHazards.length}<br>
             <strong>Trips saved locally:</strong> ${storedTrips.length}<br>
+            <strong>POIs saved locally:</strong> ${storedPois.length} (${storedPois.filter(p => p.seeded).length} Bizer-seeded)<br>
             <strong>Depth soundings saved locally:</strong> ${storedDepths.length}<br>
             <strong>Marinas in directory:</strong> ${MARINAS.length} (static reference data).<br>
             <strong>Bridges & clearance:</strong> ${BRIDGES.length} (off by default).<br>
@@ -2447,6 +3165,10 @@ ${tracks}
       document.getElementById('layerTrips').addEventListener('change', e => {
         if (e.target.checked) layers.trips.addTo(map);
         else map.removeLayer(layers.trips);
+      });
+      document.getElementById('layerPois').addEventListener('change', e => {
+        if (e.target.checked) layers.pois.addTo(map);
+        else map.removeLayer(layers.pois);
       });
       document.getElementById('layerDepths').addEventListener('change', e => {
         if (e.target.checked) layers.depths.addTo(map);
@@ -2487,6 +3209,12 @@ ${tracks}
     document.addEventListener('DOMContentLoaded', () => {
       initMap();
       wireUI();
+      // Best-effort lake-level fetch on boot. Silent if it fails (the bridge
+      // popup still works with the cached value or a manual override).
+      refreshLakeLevel({ silent: true }).then(() => {
+        // Re-render any open bridge popups so the computed clearance appears.
+        rebuildBridgeLayer();
+      }).catch(() => {});
     });
   </script>
 </body>
