@@ -1205,26 +1205,53 @@
     // crossing is low or restricted, so boaters with hardtops, biminis,
     // flybridge boats, or antennas avoid hitting them.
     //
-    // Each bridge's `clearance_ft` is the typical clearance at LOWER water
-    // datum — at higher water the clearance SHRINKS. Boaters must verify
-    // actual clearance against the day's USGS Winnipesaukee lake level
-    // (https://waterdata.usgs.gov/nwis/uv/?site_no=01080000) before transit.
+    // Two categories of crossings live here:
+    //
+    //   1. PUBLIC ROADWAY BRIDGES (highway / state-route carryings) — e.g.
+    //      Wolfeboro Bay truss, Lakeport Draw. Generally have verifiable
+    //      clearance numbers from the Bizer chart, NH DOT inventory, or
+    //      the LAUNCHES[] notes already in this file.
+    //
+    //   2. BRIDGED-ISLAND PRIVATE BRIDGES — Lake Winnipesaukee is famous
+    //      for its "bridged islands" (Bear, Long, Black Cat, Oak,
+    //      Governor's, Worcester, etc.): associations or private owners
+    //      maintain short fixed bridges from the mainland (or another
+    //      island) out to the island, and boats routinely pass UNDER them
+    //      to reach protected coves. Clearances for most of these are
+    //      NOT published in any authoritative public source — boaters
+    //      rely on the Bizer chart or on-site observation. We mark them
+    //      on the map with `clearance_ft: null` and a clear "unverified"
+    //      banner in the popup so they show up as landmarks without
+    //      implying a clearance we can't source.
+    //
+    // Each verified bridge's `clearance_ft` is the typical clearance at
+    // LOWER water datum — at higher water the clearance SHRINKS. Boaters
+    // must verify actual clearance against the day's USGS Winnipesaukee
+    // lake level (https://waterdata.usgs.gov/nwis/uv/?site_no=01080000)
+    // before transit.
     //
     // Clearance data sources for the entries below:
     //   - The existing LAUNCHES[] array in this file: the "Libby Museum
     //     (Wolfeboro)" entry already cites "Bridge clearance ~4 ft to big
     //     lake" — that's the project's own source for the Wolfeboro Bay
     //     fixed truss bridge.
-    //   - The other entries are well-known fixed roadway crossings on the
-    //     lake whose clearance is publicly obvious from the bridge design
-    //     and repeatedly published in the Lakes Region boating press.
-    //   - When Bizer chart clearance numbers are added to a future PR,
-    //     update `source` to "Bizer chart, YYYY ed., p.X".
+    //   - Bizer chart (Bizer's "Winnipesaukee" cruising guide) for the
+    //     Long Island Bridge entry — published clearance 7.7 ft at full
+    //     lake level (Bizer formula: chart_clearance + 4.3 - lake_level).
+    //   - A forum report ("~13.5 ft at high water") for the Governor's
+    //     Island Bridge entry — flagged in the popup as forum-sourced.
+    //   - The other bridged-island entries are mapped from Tyler's
+    //     reference list (2026-07-07) with approximate coords derived
+    //     from Google Maps geocoding of nearby island-property
+    //     addresses. Coords are flagged as approximate in the popup
+    //     via `coords_note`; clearance is left `null` until a Bizer
+    //     page reference or local-knowledge citation can be added.
     //
     // AGENTS.md rule #1 still applies: every entry MUST carry a non-empty
     // `source` field, and bridge data with no public citation is forbidden.
     const BRIDGES = [
       {
+        // ----- PUBLIC ROADWAY BRIDGES -----
         // Wolfeboro Bay fixed-truss bridge (Bay St / Rte 109).
         name: "Wolfeboro Bay Bridge",
         lat: 43.5837, lng: -71.2115,
@@ -1241,6 +1268,82 @@
         clearance_ft: null,                // unlimited when open; 6 ft closed
         source: "Laconia public infrastructure; routinely raised on the hour in summer (verify VHF 9 or call)",
         note: "Drawbridge — opens on signal for boat traffic when open. Closed clearance is ~6 ft. Plan around posted opening hours; call or hail on VHF 9 before transit. US-3 crosses the lake here.",
+      },
+
+      // ----- BRIDGED-ISLAND PRIVATE / ASSOCIATION BRIDGES -----
+      // Coords below are approximate, derived from Google Maps geocoding of
+      // nearby island-property addresses (Tyler's reference list, 2026-07-07).
+      // Verify each location visually before relying on the marker position.
+      // Clearance is null for all of these until a Bizer or local-knowledge
+      // citation can be added per AGENTS.md rule #1.
+
+      {
+        // Long Island (Moultonborough) — best-documented bridged island.
+        name: "Long Island Bridge",
+        lat: 43.6668, lng: -71.3470,
+        type: "fixed",
+        clearance_ft: 7.7,
+        source: "Bizer chart (Tyler's reference list, 2026-07-07)",
+        note: "Fixed bridge from Moultonborough Neck (Long Island Rd) out to Long Island, near Long Island Bridge Campground. Published clearance 7.7 ft at full lake level — actual = 7.7 + 4.3 \u2212 current lake level. Confirm visually if your air draft is close.",
+      },
+      {
+        // Black Cat Island (Moultonborough) — private / association bridge.
+        name: "Black Cat Island Bridge",
+        lat: 43.6770, lng: -71.3300,         // approx: Black Cat Island Rd area
+        type: "fixed",
+        clearance_ft: null,
+        source: "Tyler's reference list, 2026-07-07 (video evidence of boats passing under)",
+        coords_note: "Approximate — geocoded from 63 Black Cat Island Rd area. Verify on chart before relying.",
+        note: "Private / association bridge connecting Black Cat Island to the mainland via Eagle Shore Rd / Black Cat Island Rd area. Clearance not published — treat as suitable for smaller to moderate recreational boats; confirm locally or via Bizer before transit.",
+      },
+      {
+        // Governor's Island (Gilford) — forum-reported 13.5 ft at high water.
+        name: "Governor's Island Bridge",
+        lat: 43.6097, lng: -71.4253,
+        type: "fixed",
+        clearance_ft: null,                  // forum-reported, not yet chart-verified
+        source: "Tyler's reference list, 2026-07-07 (forum report: ~13.5 ft at high water)",
+        note: "Scenic fixed bridge from the Summit Ave / Rte 11D area of Gilford out to Governor's Island. One of the higher-clearance bridged-island crossings. Reported ~13.5 ft at high water — confirm via Bizer or on-site before transit.",
+      },
+      {
+        // Oak Island (Meredith) — limited clearance data.
+        name: "Oak Island Bridge",
+        lat: 43.6331, lng: -71.4501,
+        type: "fixed",
+        clearance_ft: null,
+        source: "Tyler's reference list, 2026-07-07 (limited public data; nearby address geocoding)",
+        coords_note: "Approximate — geocoded from 40 Oak Island Rd area. Verify on chart before relying.",
+        note: "Fixed bridge from Meredith Neck out to Oak Island (Oak Island Rd). Clearance not publicly published — confirm locally or via Bizer before transit.",
+      },
+      {
+        // Worcester Island (Wolfeboro) — limited public data.
+        name: "Worcester Island Bridge",
+        lat: 43.5980, lng: -71.2350,         // approx: Worcester Island area, Wolfeboro
+        type: "fixed",
+        clearance_ft: null,
+        source: "Tyler's reference list, 2026-07-07 (limited public data)",
+        coords_note: "Approximate — based on Worcester Island center coords. Verify on chart before relying.",
+        note: "Fixed bridge connecting Worcester Island to the mainland in the Wolfeboro area. Clearance not publicly published — confirm locally or via Bizer before transit.",
+      },
+      {
+        // Christmas / Plummers Island (Paugus Bay area) — south end of the lake.
+        name: "Christmas (Plummers) Island Bridge",
+        lat: 43.5550, lng: -71.4250,         // approx: Paugus Bay, toward Laconia
+        type: "fixed",
+        clearance_ft: null,
+        source: "Tyler's reference list, 2026-07-07 (limited public data)",
+        coords_note: "Approximate — based on Paugus Bay geography near Christmas Island. Verify on chart before relying.",
+        note: "Fixed bridge connecting Christmas (Plummers) Island in/near Paugus Bay (southern lake system, toward Laconia). Clearance not publicly published — confirm locally or via Bizer before transit.",
+      },
+      {
+        // Birch Island – Steamboat Island "Rainbow Bridge" — inter-island.
+        name: "Birch \u2013 Steamboat Island Bridge (\u201cRainbow Bridge\u201d)",
+        lat: 43.6210, lng: -71.3900,         // approx: inter-island area, Moultonborough
+        type: "fixed",
+        clearance_ft: null,
+        source: "Tyler's reference list, 2026-07-07 (local posts; inter-island crossing)",
+        coords_note: "Approximate — inter-island location, verify on chart before relying.",
+        note: "Smaller inter-island bridge connecting Birch Island and Steamboat Island (locally called the \u201cRainbow Bridge\u201d). Clearance not publicly published — confirm locally before transit.",
       },
     ];
 
@@ -2063,16 +2166,34 @@
       const typeLabel = b.type === 'draw' ? 'Drawbridge' :
                         b.type === 'fixed' ? 'Fixed bridge' :
                         b.type === 'causeway' ? 'Causeway' : 'Crossing';
-      const clearanceLine = b.clearance_ft != null
+      // Three clearance states:
+      //   - drawbridge (no published clearance_ft): "varies — opens on signal"
+      //   - verified (clearance_ft is a number): show the figure + Bizer formula
+      //   - unverified fixed bridge (clearance_ft is null): "clearance unverified"
+      const isDraw = b.type === 'draw';
+      const hasVerifiedClearance = !isDraw && b.clearance_ft != null;
+      const clearanceLine = hasVerifiedClearance
         ? `<strong>Typical clearance:</strong> ${b.clearance_ft} ft <small style="color:#888;">(at low water datum; \u2193 at high water)</small>`
-        : `<strong>Clearance:</strong> varies — opens on signal`;
+        : (isDraw
+          ? `<strong>Clearance:</strong> varies — opens on signal`
+          : `<strong>Clearance:</strong> <span style="color:#c0392b;">unverified</span> <small style="color:#888;">(no published public number; confirm via Bizer or on-site)</small>`);
+      // Unverified-callout banner for bridged-island entries without clearance_ft.
+      const unverifiedBanner = (!isDraw && !hasVerifiedClearance)
+        ? `<div style="margin:6px 0;padding:8px;background:#fef9e7;border-left:4px solid #d68910;border-radius:4px;font-size:12px;">
+             <strong style="color:#9a7d0a;">⚠ Clearance unverified.</strong>
+             No authoritative public clearance number — confirm via the Bizer chart, NH DOT records, or on-site observation before transit.
+           </div>`
+        : '';
+      const coordsNote = b.coords_note
+        ? `<div style="font-size:11px;color:#9a7d0a;margin-top:2px;font-style:italic;">📍 ${escapeHtml(b.coords_note)}</div>`
+        : '';
       const sourceBox = b.source
         ? `<div class="bridge-source"><strong>Source:</strong> ${escapeHtml(b.source)}</div>`
         : `<div class="bridge-source"><strong>Source:</strong> <em>pending verification</em></div>`;
       const noteLine = b.note ? `<div style="font-size:12px;color:#333;margin:4px 0;">${escapeHtml(b.note)}</div>` : '';
-      // Live clearance calculator (Bizer formula)
+      // Live clearance calculator (Bizer formula) — only meaningful for verified entries.
       const lvl = cachedLakeLevel ? cachedLakeLevel.levelFt : null;
-      const actual = b.clearance_ft != null && lvl != null
+      const actual = hasVerifiedClearance && lvl != null
         ? computeActualClearance(b.clearance_ft, lvl)
         : null;
       const lvlAge = cachedLakeLevel ? ageString(cachedLakeLevel.observedAt) : 'no reading yet';
@@ -2082,15 +2203,17 @@
              <strong style="color:#1e8449;">📏 Today's clearance: ${actual} ft</strong><br>
              <small style="color:#555;">Lake-level formula: ${b.clearance_ft} + ${BIZER_FULL_LAKE_FT} \u2212 ${lvl} = ${actual}</small>
            </div>`
-        : (b.clearance_ft != null
+        : (hasVerifiedClearance
           ? `<div style="margin:6px 0;padding:8px;background:#fef9e7;border-left:4px solid #d68910;border-radius:4px;font-size:12px;">
                Lake level not loaded \u2014 enter it below or pull-to-refresh.
              </div>`
           : '');
       const lakeLevelLink = `USGS Lake Winnipesaukee real-time level: <a href="https://waterdata.usgs.gov/monitoring-location/01080000/" target="_blank" rel="noopener">waterdata.usgs.gov</a> \u2014 the IV feed is currently offline; check the lake-level table on <a href="http://bizer.com/bztnews.htm" target="_blank" rel="noopener">bizer.com/bztnews.htm</a> as a backup.`;
-      // Manual override entry \u2014 always available so the user can enter the
-      // current lake level if the feed is offline.
-      const overrideLine = b.clearance_ft != null ? `
+      // Manual override entry \u2014 only meaningful for verified entries (a Bizer
+      // clearance is needed before the formula can compute). Hidden for
+      // unverified entries so users don't try to compute a clearance against
+      // a chart value that doesn't exist.
+      const overrideLine = hasVerifiedClearance ? `
         <div style="margin-top:8px;padding:6px;background:#f4f6f7;border-radius:4px;">
           <div style="font-size:11px;color:#555;margin-bottom:4px;">
             Lake level: <strong>${lvl != null ? lvl + ' ft' : '—'}</strong>
@@ -2107,6 +2230,8 @@
       return `
         <strong style="font-size:14px;">${escapeHtml(b.name)}</strong> <small style="color:#888;">· ${escapeHtml(typeLabel)}</small><br>
         <div style="margin:4px 0 2px;">${clearanceLine}</div>
+        ${coordsNote}
+        ${unverifiedBanner}
         ${actualLine}
         ${noteLine}
         ${overrideLine}
