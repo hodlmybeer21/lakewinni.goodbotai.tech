@@ -2592,10 +2592,43 @@
         weight: 4,
         opacity: 0.9,
         dashArray: '8, 8',
-        interactive: false,
+        interactive: true,
+      });
+      line.on('click', e => {
+        L.DomEvent.stopPropagation(e);
+        openRouteActionsModal(route);
       });
       line.addTo(layers.routes);
       route._line = line;
+    }
+
+    function openRouteActionsModal(route) {
+      const modal = document.getElementById('modal');
+      const body = document.getElementById('modalBody');
+      const actions = document.getElementById('modalActions');
+      const title = document.getElementById('modalTitle');
+      title.textContent = `Route (${route.points.length} points)`;
+      body.innerHTML = `
+        <p style="margin:0 0 8px;">Created: ${new Date(route.added).toLocaleString()}</p>
+        <p style="margin:0 0 8px;">Color: <span style="color:#1e6fd9;font-weight:bold;">blue (dashed)</span></p>
+      `;
+      actions.innerHTML = `
+        <button class="btn btn-secondary" onclick="cancelModal()">Close</button>
+        <button class="btn btn-danger" onclick="deleteRoute('${route.id}')">🗑 Delete</button>
+      `;
+      modal.classList.add('show');
+    }
+
+    function deleteRoute(routeId) {
+      const idx = storedRoutes.findIndex(r => r.id === routeId);
+      if (idx === -1) { cancelModal(); return; }
+      const route = storedRoutes[idx];
+      if (route._line) {
+        try { layers.routes.removeLayer(route._line); } catch (_) {}
+      }
+      storedRoutes.splice(idx, 1);
+      saveRoutes();
+      cancelModal();
     }
 
     function loadRoutesIntoLayer() {
@@ -2657,8 +2690,26 @@
       } else {
         if (drawingRoute.markers) drawingRoute.markers.forEach(m => map.removeLayer(m));
         if (drawingRoute.line) map.removeLayer(drawingRoute.line);
+        if (drawingRoute.points.length === 1) {
+          flashRouteMessage('A route needs at least 2 points — tap again to extend.', 2200);
+        }
       }
       drawingRoute = null;
+    }
+
+    function flashRouteMessage(text, ms) {
+      let m = document.getElementById('routeFlash');
+      if (!m) {
+        m = document.createElement('div');
+        m.id = 'routeFlash';
+        m.className = 'hud';
+        m.style.cssText = 'background:#fff3cd;color:#856404;border:1px solid #ffeeba;padding:8px 12px;border-radius:8px;font-size:13px;position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.2);';
+        document.body.appendChild(m);
+      }
+      m.textContent = text;
+      m.style.display = 'block';
+      clearTimeout(m._t);
+      m._t = setTimeout(() => { m.style.display = 'none'; }, ms || 2000);
     }
 
     function startRouteAt(latlng) {
