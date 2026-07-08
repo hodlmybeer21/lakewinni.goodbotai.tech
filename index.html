@@ -343,6 +343,7 @@
     .btn-secondary { background: #ecf0f1; color: #333; }
     .btn-danger { background: #c0392b; color: white; }
     /* Custom marker styles */
+    .route-cursor-active #map { cursor: crosshair !important; }
     .buoy-marker {
       width: 14px;
       height: 14px;
@@ -622,6 +623,7 @@
   </div>
 
   <div id="buoyBanner" class="hud">📍 Tap the map to place a buoy or hazard</div>
+  <div id="routeBanner" class="hud" style="display:none;">✏️ Drag your finger to sketch a route — tap to start a new one</div>
   <div id="bathyBanner" class="hud bathy-banner" style="display:none;">⚠️ NH Bathymetry — reference only, NOT for navigation.</div>
 
   <div id="layers" class="hud collapsed">
@@ -631,6 +633,7 @@
     </div>
     <div id="layers-body">
       <label class="layer-toggle"><input type="checkbox" id="layerBuoys" /> Buoys</label>
+      <label class="layer-toggle"><input type="checkbox" id="layerRoutes" /> Routes</label>
       <label class="layer-toggle"><input type="checkbox" id="layerLaunches" checked /> Launches</label>
       <label class="layer-toggle"><input type="checkbox" id="layerMarinas" checked /> Marinas &amp; fuel</label>
       <label class="layer-toggle"><input type="checkbox" id="layerBridges" /> Bridges &amp; clearance <small>(off by default)</small></label>
@@ -665,6 +668,7 @@
   <div id="actions" class="hud">
     <button class="icon-btn" id="recenterBtn" title="Recenter on me">⊙</button>
     <button class="icon-btn" id="buoyModeBtn" title="Add buoy mode">📍</button>
+    <button class="icon-btn" id="routeModeBtn" title="Draw route mode">✏️</button>
     <button class="icon-btn" id="tripsBtn" title="Trips">🛶</button>
     <button class="icon-btn" id="exportBtn" title="Export data">💾</button>
     <button class="icon-btn" id="rescueBtn" title="Where am I — share my location / call for help">🆘</button>
@@ -1477,6 +1481,10 @@
       // Crowdsourced depth soundings — empty layer, no auto-display
       layers.depths = L.layerGroup();
       storedDepths.forEach(d => addDepthToLayer(d));
+
+      // Routes — finger-drawn channels (anonymous, dashed blue).
+      // Off by default; user toggles on with the Routes checkbox.
+      layers.routes = L.layerGroup();
 
       // NH GRANIT bathymetry — low-confidence reference.
       // Off by default. Layer objects created here; data loads lazily
@@ -2325,6 +2333,12 @@
     }
 
     function onMapClick(e) {
+      if (routeDrawMode) {
+        // Click commits the current route (if any) and starts a new one at the click point.
+        finishRoute();
+        startRouteAt(e.latlng);
+        return;
+      }
       if (!buoyAddMode) return;
       pendingBuoyLatLng = e.latlng;
       showAddChoiceModal(e.latlng);
@@ -2551,6 +2565,116 @@
       cancelModal();
       exitBuoyMode();
     };
+
+    // ----- Route drawing (finger-draw channels / recommended routes) -----
+    // Anonymous polylines, dashed, blue. Stored locally for now (server-side later).
+    let routeDrawMode = false;
+    let drawingRoute = null;       // { id, points: [latlng], line: L.polyline, markers: [] }
+    let storedRoutes = [];
+    try { storedRoutes = JSON.parse(localStorage.getItem('winniRoutes') || '[]'); } catch (e) { storedRoutes = []; }
+
+    function saveRoutes() {
+      localStorage.setItem('winniRoutes', JSON.stringify(storedRoutes));
+    }
+
+    function addRouteToLayer(route) {
+      if (!route.points || route.points.length < 2) return;
+      const latlngs = route.points.map(p => [p.lat, p.lng]);
+      const line = L.polyline(latlngs, {
+        color: '#1e6fd9',
+        weight: 4,
+        opacity: 0.9,
+        dashArray: '8, 8',
+        interactive: false,
+      });
+      line.addTo(layers.routes);
+      route._line = line;
+    }
+
+    function loadRoutesIntoLayer() {
+      storedRoutes.forEach(addRouteToLayer);
+    }
+
+    // Hydrate routes into the layer now that state + layer are ready.
+    loadRoutesIntoLayer();
+
+    function enterRouteDrawMode() {
+      routeDrawMode = true;
+      document.getElementById('routeModeBtn').classList.add('active');
+      document.getElementById('routeBanner').style.display = 'block';
+      document.getElementById('layerRoutes').checked = true;
+      layers.routes.addTo(map);
+      document.body.classList.add('route-cursor-active');
+      if (typeof exitBuoyMode === 'function') exitBuoyMode();
+    }
+
+    function exitRouteDrawMode() {
+      routeDrawMode = false;
+      document.getElementById('routeModeBtn').classList.remove('active');
+      document.getElementById('routeBanner').style.display = 'none';
+      document.body.classList.remove('route-cursor-active');
+      finishRoute();
+    }
+
+    function finishRoute() {
+      if (!drawingRoute) return;
+      // Commit if it has at least 2 points; otherwise discard
+      if (drawingRoute.points.length >= 2) {
+        const route = {
+          id: 'r' + Date.now() + Math.random().toString(36).slice(2, 7),
+          points: drawingRoute.points.map(p => ({ lat: p.lat, lng: p.lng })),
+          added: new Date().toISOString(),
+        };
+        storedRoutes.push(route);
+        saveRoutes();
+        addRouteToLayer(route);
+        // Remove the live drawing markers + line (addRouteToLayer made a fresh rendered copy)
+        if (drawingRoute.markers) drawingRoute.markers.forEach(m => map.removeLayer(m));
+        if (drawingRoute.line) map.removeLayer(drawingRoute.line);
+      } else {
+        if (drawingRoute.markers) drawingRoute.markers.forEach(m => map.removeLayer(m));
+        if (drawingRoute.line) map.removeLayer(drawingRoute.line);
+      }
+      drawingRoute = null;
+    }
+
+    function startRouteAt(latlng) {
+      drawingRoute = {
+        points: [latlng],
+        line: L.polyline([latlng], {
+          color: '#1e6fd9',
+          weight: 4,
+          opacity: 0.9,
+          dashArray: '8, 8',
+          interactive: false,
+        }),
+        markers: [],
+      };
+      drawingRoute.line.addTo(map);
+      // Dot at the start
+      const dot = L.circleMarker(latlng, {
+        radius: 4,
+        color: '#1e6fd9',
+        fillColor: '#1e6fd9',
+        fillOpacity: 1,
+        interactive: false,
+      }).addTo(map);
+      drawingRoute.markers.push(dot);
+    }
+
+    function extendRouteTo(latlng) {
+      if (!drawingRoute) return;
+      const last = drawingRoute.points[drawingRoute.points.length - 1];
+      // throttle: skip points too close together (touch/finger can be jittery)
+      if (last) {
+        const dx = (latlng.lng - last.lng) * 111320 * Math.cos(last.lat * Math.PI / 180);
+        const dy = (latlng.lat - last.lat) * 111320;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        if (d < 3) return; // <3m, ignore
+      }
+      drawingRoute.points.push(latlng);
+      drawingRoute.line.setLatLngs(drawingRoute.points.map(p => [p.lat, p.lng]));
+    }
 
     // ----- Buoy add mode -----
     function enterBuoyMode() {
@@ -3225,8 +3349,36 @@ ${tracks}
         else enterBuoyMode();
       });
 
+      document.getElementById('routeModeBtn').addEventListener('click', () => {
+        if (routeDrawMode) exitRouteDrawMode();
+        else enterRouteDrawMode();
+      });
+
+      // Finger-drag drawing: mousedown starts a route, mousemove extends,
+      // mouseup commits (if it traveled) or discards (if it was a tap).
+      map.on('mousedown', e => {
+        if (!routeDrawMode) return;
+        if (e.originalEvent && e.originalEvent.button !== 0) return; // left-click only
+        // If a previous route is in progress, finish it first
+        finishRoute();
+        startRouteAt(e.latlng);
+      });
+      map.on('mousemove', e => {
+        if (!routeDrawMode || !drawingRoute) return;
+        // Only extend while the primary button is held
+        if (e.originalEvent && e.originalEvent.buttons !== 1) return;
+        extendRouteTo(e.latlng);
+      });
+      map.on('mouseup', e => {
+        if (!routeDrawMode || !drawingRoute) return;
+        if (e.originalEvent && e.originalEvent.button !== 0) return;
+        // If mouseup happens at the same spot (a tap, not a drag), keep the route
+        // open so the user can drag further; committing only happens on the next
+        // click or when exiting draw mode.
+      });
+
       document.getElementById('exportBtn').addEventListener('click', () => {
-        const payload = { buoys: storedBuoys, hazards: storedHazards, trips: storedTrips, depths: storedDepths, pois: storedPois };
+        const payload = { buoys: storedBuoys, hazards: storedHazards, trips: storedTrips, depths: storedDepths, pois: storedPois, routes: storedRoutes };
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -3272,6 +3424,10 @@ ${tracks}
       document.getElementById('layerBuoys').addEventListener('change', e => {
         if (e.target.checked) layers.buoys.addTo(map);
         else map.removeLayer(layers.buoys);
+      });
+      document.getElementById('layerRoutes').addEventListener('change', e => {
+        if (e.target.checked) layers.routes.addTo(map);
+        else map.removeLayer(layers.routes);
       });
       document.getElementById('layerLaunches').addEventListener('change', e => {
         if (e.target.checked) layers.launches.addTo(map);
