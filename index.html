@@ -2748,7 +2748,17 @@
     try { storedRoutes = JSON.parse(localStorage.getItem('winniRoutes') || '[]'); } catch (e) { storedRoutes = []; }
 
     function saveRoutes() {
-      localStorage.setItem('winniRoutes', JSON.stringify(storedRoutes));
+      // Strip Leaflet runtime refs (e.g. route._line has circular _handlers/_map)
+      // so JSON.stringify doesn't blow up on the second saveRoutes() call.
+      const clean = storedRoutes.map(r => {
+        const { _line, ...rest } = r;
+        return rest;
+      });
+      try {
+        localStorage.setItem('winniRoutes', JSON.stringify(clean));
+      } catch (e) {
+        console.warn('saveRoutes: failed to persist', e);
+      }
     }
 
     function addRouteToLayer(route) {
