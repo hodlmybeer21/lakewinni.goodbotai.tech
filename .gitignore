@@ -6,6 +6,7 @@ Thumbs.db
 
 # Local dev artifacts
 data/
+!data/winni-buoys.json
 *.log
 
 # Vercel
