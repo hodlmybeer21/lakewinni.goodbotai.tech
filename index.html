@@ -1469,6 +1469,7 @@
       // Note: NOT added to map by default — toggle controls visibility.
 
       layers.buoys = L.layerGroup();
+      seedBuoysIfNeeded();
       storedBuoys.forEach(b => addBuoyToLayer(b));
       layers.buoys.addTo(map);
 
@@ -1588,6 +1589,31 @@
 
     const POI_SEED_VERSION = '1';
     const POI_SEED_FLAG_KEY = 'winniPoisV1Seeded';
+
+    // Verified buoys seed (Tyler Hudson, 2026-07-08).
+    // Each entry mirrors the schema of storedBuoys: id, lat, lng, color, note,
+    // added (ISO). On first load (or when BUOY_SEED_VERSION is bumped) the
+    // site copies these into localStorage so every visitor sees them.
+    // User-added buoys persist normally and stack on top of the seed.
+    const BUOY_SEED_VERSION = '1';
+    const BUOY_SEED_FLAG_KEY = 'winniBuoysV1Seeded';
+    const BUOY_SEED = [
+      // Source: /data/winni-buoys.json in the repo. Filled in once Tyler
+      // gets a non-truncated copy of his verified buoy file past chat upload
+      // pipeline. Until then, the seed is empty and the layer is empty.
+    ];
+
+    function seedBuoysIfNeeded() {
+      if (!Array.isArray(BUOY_SEED) || BUOY_SEED.length === 0) return;
+      if (localStorage.getItem(BUOY_SEED_FLAG_KEY) === BUOY_SEED_VERSION) return;
+      const existing = new Set(storedBuoys.map(b => b.id));
+      BUOY_SEED.forEach(b => {
+        if (existing.has(b.id)) return; // don't clobber user edits
+        storedBuoys.push({ ...b });
+      });
+      saveBuoys();
+      try { localStorage.setItem(BUOY_SEED_FLAG_KEY, BUOY_SEED_VERSION); } catch (_) {}
+    }
 
     // Directory-seeded POIs. Coordinates come from the nearest entry in
     // LAUNCHES[] (which has authoritative coords). The popup keeps the
