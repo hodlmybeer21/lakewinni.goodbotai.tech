@@ -721,6 +721,7 @@
     <span id="routePointLabel"><span id="routePointCount">0</span> points</span>
     <button class="icon-btn" id="routeUndoBtn" title="Undo last waypoint">↶</button>
     <button class="icon-btn" id="routeFinishBtn" title="Finish route">✓</button>
+    <button class="icon-btn" id="routeExportBtn" title="Export last finished route as JSON" onclick="exportLastRoute()">💾</button>
   </div>
   <div id="bathyBanner" class="hud bathy-banner" style="display:none;">⚠️ NH Bathymetry — reference only, NOT for navigation.</div>
   <div id="safetyDisclaimer" class="safety-banner hud" style="display:none;">
@@ -2744,6 +2745,10 @@
     // Anonymous polylines, dashed, blue. Stored locally for now (server-side later).
     let routeDrawMode = false;
     let drawingRoute = null;       // { id, points: [latlng], line: L.polyline, markers: [] }
+    let routeMarkerLayer = null;   // L.layerGroup that holds in-progress waypoint dots (cleaned up on finish/undo)
+    let lastFinishedRoute = null;  // most recently committed route, for the per-route export button
+    const ROUTE_SOFT_CAP = 500;    // soft warning when a single route exceeds this many points
+    const ROUTE_DRAFT_LIMIT = 50;  // max # of finished routes kept in localStorage (oldest pruned)
     let storedRoutes = [];
     try { storedRoutes = JSON.parse(localStorage.getItem('winniRoutes') || '[]'); } catch (e) { storedRoutes = []; }
 
@@ -2822,6 +2827,11 @@
       document.getElementById('layerRoutes').checked = true;
       layers.routes.addTo(map);
       document.body.classList.add('route-cursor-active');
+      // Layer group for in-progress waypoint dots. Add to map on enter, clear on finish/undo
+      // so we don't leak circleMarker objects on the map canvas (caused the blue-screen wedge).
+      if (!routeMarkerLayer) routeMarkerLayer = L.layerGroup();
+      routeMarkerLayer.clearLayers();
+      routeMarkerLayer.addTo(map);
       // In draw mode: keep drawing interactive (tap-to-add waypoint), but allow
       // finger-drag panning and pinch-zoom so users can extend long routes by
       // panning between taps. Disable keyboard pan and scroll-wheel zoom only.
@@ -2842,6 +2852,10 @@
       if (map.boxZoom) map.boxZoom.enable();
       if (map.keyboard) map.keyboard.enable();
       finishRoute();
+      // Remove the in-progress marker layer from the map (committed routes stay in layers.routes)
+      if (routeMarkerLayer) {
+        try { map.removeLayer(routeMarkerLayer); } catch (_) {}
+      }
       updateRouteActionBar();
     }
 
@@ -2855,19 +2869,71 @@
           added: new Date().toISOString(),
         };
         storedRoutes.push(route);
+        // Auto-prune old drafts to keep localStorage well under the 5 MB cap.
+        // Keeps the most-recent ROUTE_DRAFT_LIMIT routes. Older ones are
+        // dropped from storage (still visible on the map until reload).
+        if (storedRoutes.length > ROUTE_DRAFT_LIMIT) {
+          const dropped = storedRoutes.splice(0, storedRoutes.length - ROUTE_DRAFT_LIMIT);
+          dropped.forEach(r => { if (r._line) { try { layers.routes.removeLayer(r._line); } catch (_) {} } });
+        }
         saveRoutes();
         addRouteToLayer(route);
-        // Remove the live drawing markers + line (addRouteToLayer made a fresh rendered copy)
-        if (drawingRoute.markers) drawingRoute.markers.forEach(m => map.removeLayer(m));
-        if (drawingRoute.line) map.removeLayer(drawingRoute.line);
+        // Keep the live drawing line until the user starts a new one — only clear the dots
+        if (routeMarkerLayer) routeMarkerLayer.clearLayers();
+        if (drawingRoute.line) { try { map.removeLayer(drawingRoute.line); } catch (_) {} }
+        drawingRoute.markers = [];
+        // Remember this route so the per-route export button can offer it
+        lastFinishedRoute = route;
+        // Visual confirmation (was missing — caused "did it save?" confusion)
+        flashRouteMessage(`✓ Route saved (${route.points.length} points). Tap 💾 to export this section.`, 3500);
       } else {
-        if (drawingRoute.markers) drawingRoute.markers.forEach(m => map.removeLayer(m));
-        if (drawingRoute.line) map.removeLayer(drawingRoute.line);
+        if (routeMarkerLayer) routeMarkerLayer.clearLayers();
+        if (drawingRoute.markers) drawingRoute.markers.forEach(m => { try { map.removeLayer(m); } catch (_) {} });
+        if (drawingRoute.line) { try { map.removeLayer(drawingRoute.line); } catch (_) {} }
         if (drawingRoute.points.length === 1) {
           flashRouteMessage('A route needs at least 2 points — tap again to extend.', 2200);
         }
       }
       drawingRoute = null;
+    }
+
+    function exportLastRoute() {
+      if (!lastFinishedRoute) {
+        flashRouteMessage('No route to export yet — draw one and tap ✓ first.', 3000);
+        return;
+      }
+      // Find the next section number by checking already-downloaded filenames in localStorage.
+      // Stored as 'winniRouteSectionN' (highest N wins).
+      let nextN = 1;
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('winniRouteSection')) {
+            const n = parseInt(k.replace('winniRouteSection', ''), 10);
+            if (isFinite(n) && n >= nextN) nextN = n + 1;
+          }
+        }
+      } catch (e) { /* ignore */ }
+      const sectionNum = String(nextN).padStart(2, '0');
+      const payload = {
+        section: sectionNum,
+        id: lastFinishedRoute.id,
+        points: lastFinishedRoute.points,
+        added: lastFinishedRoute.added,
+        pointCount: lastFinishedRoute.points.length,
+        format: 'winni-routes-section-v1',
+        hint: 'Drop this file into data/winni-routes.json (append to "routes" array) and push to deploy.',
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `winni-routes-section-${sectionNum}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      // Mark this section number as used so the next export increments
+      try { localStorage.setItem('winniRouteSection' + sectionNum, '1'); } catch (e) { /* ignore */ }
+      flashRouteMessage(`💾 Exported winni-routes-section-${sectionNum}.json (${lastFinishedRoute.points.length} points). Send to GoodBot.`, 4000);
     }
 
     function flashRouteMessage(text, ms) {
@@ -2911,7 +2977,15 @@
         fillColor: '#1e6fd9',
         fillOpacity: 1,
         interactive: false,
-      }).addTo(map);
+      });
+      // Add to the dedicated layer group (not the map directly) so the dots
+      // are removed cleanly on finish/undo. Previously they accumulated on
+      // the map canvas and caused a blue-screen wedge on mobile.
+      if (routeMarkerLayer) {
+        dot.addTo(routeMarkerLayer);
+      } else {
+        dot.addTo(map);
+      }
       drawingRoute.markers.push(dot);
     }
 
@@ -2928,6 +3002,12 @@
       drawingRoute.points.push(latlng);
       drawingRoute.line.setLatLngs(drawingRoute.points.map(p => [p.lat, p.lng]));
       addRouteWaypointMarker(latlng);
+      // Soft cap warning — not a hard stop, just a nudge
+      if (drawingRoute.points.length === ROUTE_SOFT_CAP) {
+        flashRouteMessage(`⚠ ${ROUTE_SOFT_CAP} waypoints — consider finishing this section and starting a new one.`, 4000);
+      } else if (drawingRoute.points.length > ROUTE_SOFT_CAP && drawingRoute.points.length % 100 === 0) {
+        flashRouteMessage(`⚠ ${drawingRoute.points.length} waypoints — getting long. Finish soon.`, 3000);
+      }
       updateRouteActionBar();
     }
 
