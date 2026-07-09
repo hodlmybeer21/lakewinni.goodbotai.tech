@@ -1689,18 +1689,16 @@
     const POI_SEED_VERSION = '1';
     const POI_SEED_FLAG_KEY = 'winniPoisV1Seeded';
 
-    // Verified buoys seed (Tyler Hudson, 2026-07-08).
+    // Verified buoys seed (Tyler Hudson, 2026-07-08; 41 added 2026-07-09 = 480 total).
     // Each entry mirrors the schema of storedBuoys: id, lat, lng, color, note,
     // added (ISO). On first load (or when BUOY_SEED_VERSION is bumped) the
     // site copies these into localStorage so every visitor sees them.
     // User-added buoys persist normally and stack on top of the seed.
-    const BUOY_SEED_VERSION = '1';
+    // The authoritative copy lives in /data/winni-buoys.json (fetched below);
+    // the inline array stays empty so the file is the single source of truth.
+    const BUOY_SEED_VERSION = '2';
     const BUOY_SEED_FLAG_KEY = 'winniBuoysV1Seeded';
-    const BUOY_SEED = [
-      // Source: /data/winni-buoys.json in the repo. Filled in once Tyler
-      // gets a non-truncated copy of his verified buoy file past chat upload
-      // pipeline. Until then, the seed is empty and the layer is empty.
-    ];
+    const BUOY_SEED = [];
 
     function seedBuoysIfNeeded() {
       if (localStorage.getItem(BUOY_SEED_FLAG_KEY) === BUOY_SEED_VERSION) return;
