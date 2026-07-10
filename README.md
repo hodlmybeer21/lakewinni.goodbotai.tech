@@ -6,7 +6,7 @@ Live: **https://lakewinni.goodbotai.tech**
 
 ## What it does
 
-- **Live GPS dot** for your boat (phone GPS, ~3 m accuracy)
+- **Live GPS dot** for your boat (phone GPS, ~3 m accuracy) with a **pickable vessel icon** — 9 options (🚤 speedboat, ⛵ sailboat, 🛥 yacht, 🚣 kayak, 🛶 canoe, 🏄 paddleboard, 🤿 diver, 🎣 fishing, 🧜‍♀️ mermaid). Defaults to speedboat. Saved locally per device. First-time visitors are prompted when they tap Start GPS; everyone can change it any time from the 🚤 button in the action bar.
 - **Speed** in knots + **heading** in degrees + **compass rose**
 - **Public boat launches** — all 18+ NH launches with fees, parking notes, and restrictions
 - **Major islands** (rough polygons, for orientation only)

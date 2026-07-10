@@ -5,7 +5,7 @@
 
 ## TL;DR
 
-A single-file static web app (`index.html`, ~165 KB) that gives Winnipesaukee boaters a Garmin-HUD-style map with live GPS, crowdsourced buoys/hazards, NH GRANIT bathymetry (low-confidence reference), marina & fuel-dock locator, bridges & clearance (off by default), shipped recommended routes (cached locally from `data/winni-routes.json`), a "Where am I" rescue helper, and GPS trip logging with GPX export. No backend. Auto-deploys to Vercel on push to `main`.
+A single-file static web app (`index.html`, ~175 KB) that gives Winnipesaukee boaters a Garmin-HUD-style map with live GPS (pickable vessel icon: 9 options from speedboat to mermaid), crowdsourced buoys/hazards, NH GRANIT bathymetry (low-confidence reference), marina & fuel-dock locator, bridges & clearance (off by default), shipped recommended routes (cached locally from `data/winni-routes.json`), a "Where am I" rescue helper, and GPS trip logging with GPX export. No backend. Auto-deploys to Vercel on push to `main`.
 
 ## Identity
 
@@ -23,7 +23,7 @@ A single-file static web app (`index.html`, ~165 KB) that gives Winnipesaukee bo
 
 ```
 winni-map/
-├── index.html        ← ENTIRE APP. Single file, ~165 KB. HTML + CSS + JS.
+├── index.html        ← ENTIRE APP. Single file, ~175 KB. HTML + CSS + JS.
 ├── README.md         ← User-facing documentation
 ├── AGENTS.md         ← This file (session handoff)
 ├── vercel.json       ← Vercel config (static, root = index.html)
@@ -210,6 +210,8 @@ cd /root/.openclaw/workspace/projects/winni-map && git status --short && git log
 10. **All data layers start OFF on first visit (as of 2026-07-10).** Tyler wants first-time visitors to experience the layers one at a time. Don't re-add `checked` attributes to layer checkboxes or `.addTo(map)` calls in `initMap()`. Programmatic `checked = true` + `addTo(map)` IS allowed in user-triggered paths (saving a buoy, viewing a trip, entering route-draw mode, etc.) — the rule is only about the initial empty-map state. If you add a new layer, default it OFF. Only the base map (OSM tiles) and the always-on island orientation polygons render at boot.
 
 11. **`seedShippedRoutesIfNeeded()` MUST be called AFTER `initMap()` runs.** The cache-render path inside the function does `line.addTo(layers.routes)` synchronously, which throws if `layers.routes` is undefined. `initMap()` is what creates `layers.routes`. The function is currently invoked from inside the `DOMContentLoaded` handler in `wireUI()`'s neighborhood (search for `seedShippedRoutesIfNeeded();` near the bottom of the script). Do NOT move the call back to script-load time (before `DOMContentLoaded`) — it will break visit 2+ of the app with the symptom "routes appear on first visit, vanish on every subsequent visit". The function also has an internal guard (`if (!layers || !layers.routes) return;`) as a defense-in-depth check, but the proper fix is to keep the call after `initMap()`.
+
+12. **Vessel icon picker (`VESSEL_ICONS` array, key `winniVesselIcon`) ships 9 emoji-based vessel icons.** Default is `speedboat`. The icon is used as the user's GPS marker (`layers.user`) and to color the accuracy circle. On first-ever Start GPS tap, the picker is shown automatically (chained into startTracking via `_vesselPickerThenStartTracking`). Subsequent changes are always available via the 🚤 button in the action bar (`#vesselIconBtn`), which mirrors the current vessel emoji. To add a new icon: append to `VESSEL_ICONS` with `{id, emoji, label, color}`. Don't change `DEFAULT_VESSEL_ID` without a migration; users who already have a saved choice are unaffected. Don't use raster/SVG icons in the picker — emoji keeps the payload tiny (~50 bytes per icon vs ~2 KB for SVG).
 
 ## Contact
 

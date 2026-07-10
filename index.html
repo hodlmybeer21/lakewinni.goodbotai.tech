@@ -770,6 +770,7 @@
   </div>
 
   <div id="actions" class="hud">
+    <button class="icon-btn" id="vesselIconBtn" title="Change vessel icon" onclick="showVesselPickerModal()">🚤</button>
     <button class="icon-btn" id="recenterBtn" title="Recenter on me">⊙</button>
     <button class="icon-btn" id="buoyModeBtn" title="Add buoy mode">📍</button>
     <button class="icon-btn" id="routeModeBtn" title="Draw route mode">✏️</button>
@@ -2574,6 +2575,49 @@
 
     // ----- Safety disclaimer (one-time on first visit) -----
     const SAFETY_DISCLAIMER_FLAG = 'winniSafetyDisclaimerAcked';
+
+    // ----- Vessel icon picker (your location on the map) -----
+    // 9-icon library. Emoji-based for tiny payload + cross-platform rendering.
+    // Each entry: { id, emoji, label, color }. Color is used for the
+    // accuracy-circle outline so it matches the marker.
+    const VESSEL_ICONS = [
+      { id: 'speedboat', emoji: '🚤', label: 'Speedboat',     color: '#e74c3c' },
+      { id: 'sailboat',  emoji: '⛵', label: 'Sailboat',      color: '#3498db' },
+      { id: 'yacht',     emoji: '🛥', label: 'Yacht / cruiser', color: '#2c3e50' },
+      { id: 'kayak',     emoji: '🚣', label: 'Kayak / rowboat', color: '#27ae60' },
+      { id: 'canoe',     emoji: '🛶', label: 'Canoe',         color: '#16a085' },
+      { id: 'sup',       emoji: '🏄', label: 'Paddleboard / surf', color: '#f39c12' },
+      { id: 'diver',     emoji: '🤿', label: 'Diver / snorkel', color: '#00bcd4' },
+      { id: 'fishing',   emoji: '🎣', label: 'Fishing boat',  color: '#8e44ad' },
+      { id: 'mermaid',   emoji: '🧜\u200d♀️', label: 'Mermaid (just for fun)', color: '#e91e63' },
+    ];
+    const DEFAULT_VESSEL_ID = 'speedboat';
+    const VESSEL_ICON_KEY = 'winniVesselIcon';
+
+    function getCurrentVessel() {
+      try {
+        const id = localStorage.getItem(VESSEL_ICON_KEY);
+        if (id) {
+          const v = VESSEL_ICONS.find(x => x.id === id);
+          if (v) return v;
+        }
+      } catch (_) { /* private mode */ }
+      return VESSEL_ICONS.find(x => x.id === DEFAULT_VESSEL_ID);
+    }
+
+    function hasUserChosenVessel() {
+      try { return !!localStorage.getItem(VESSEL_ICON_KEY); } catch (_) { return false; }
+    }
+
+    function setCurrentVessel(id) {
+      try { localStorage.setItem(VESSEL_ICON_KEY, id); } catch (_) { /* private mode */ }
+    }
+
+    function vesselIconHtml(vessel) {
+      // White circular badge with the emoji centered. Sized 30px so the
+      // emoji renders crisply at map zoom 12-16 (the typical boating zoom).
+      return `<div style="width:30px;height:30px;border-radius:50%;background:#fff;border:3px solid ${vessel.color};box-shadow:0 0 0 2px ${vessel.color}40, 0 2px 6px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1;">${vessel.emoji}</div>`;
+    }
     function maybeShowSafetyDisclaimer() {
       try {
         if (localStorage.getItem(SAFETY_DISCLAIMER_FLAG) === '1') return;
@@ -3543,24 +3587,26 @@ ${tracks}
       setGpsStatus(`${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`, 'on');
 
       if (!userMarker) {
+        const vessel = getCurrentVessel();
         const icon = L.divIcon({
           className: '',
-          html: '<div style="width:18px;height:18px;border-radius:50%;background:#e74c3c;border:3px solid white;box-shadow:0 0 0 2px rgba(231,76,60,0.4), 0 2px 6px rgba(0,0,0,0.5);"></div>',
-          iconSize: [18, 18],
-          iconAnchor: [9, 9],
+          html: vesselIconHtml(vessel),
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
         });
         userMarker = L.marker(latlng, { icon, zIndexOffset: 1000 }).addTo(layers.user);
-        userMarker.bindPopup('You are here');
+        userMarker.bindPopup(`You are here (${vessel.label})`);
       } else {
         userMarker.setLatLng(latlng);
       }
 
       if (c.accuracy) {
         if (!userAccuracyCircle) {
+          const vesselColor = getCurrentVessel().color;
           userAccuracyCircle = L.circle(latlng, {
             radius: c.accuracy,
-            color: '#e74c3c',
-            fillColor: '#e74c3c',
+            color: vesselColor,
+            fillColor: vesselColor,
             fillOpacity: 0.08,
             weight: 1,
           }).addTo(layers.user);
@@ -3666,6 +3712,72 @@ ${tracks}
       const idx = Math.round(bearing / 45) % 8;
       return labels[idx];
     }
+
+    function showVesselPickerModal() {
+      const modal = document.getElementById('modal');
+      const body = document.getElementById('modalBody');
+      const actions = document.getElementById('modalActions');
+      const title = document.getElementById('modalTitle');
+      title.textContent = '🧜\u200d♀️ Pick your vessel';
+      const current = getCurrentVessel();
+      const firstTime = !hasUserChosenVessel();
+      const subtitle = firstTime
+        ? 'Pick what you\'re on today. This icon will show where you are on the map. You can change it any time from the action bar.'
+        : 'This is the icon that shows where you are on the map. Pick whatever matches your ride today.';
+      // Render a 3-column grid of icon buttons. Each is a vessel option;
+      // tapping selects it, closes the modal, and updates the marker.
+      const grid = VESSEL_ICONS.map(v => {
+        const isSelected = v.id === current.id;
+        const border = isSelected ? `3px solid ${v.color}` : '2px solid #ddd';
+        const bg = isSelected ? '#f0f8ff' : '#fff';
+        return `<button data-vessel-id="${v.id}" onclick="selectVessel('${v.id}')" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border:${border};border-radius:8px;background:${bg};font-family:inherit;font-size:11px;color:#333;line-height:1.2;">
+          <div style="width:36px;height:36px;border-radius:50%;background:#fff;border:2px solid ${v.color};display:flex;align-items:center;justify-content:center;font-size:22px;">${v.emoji}</div>
+          <span style="text-align:center;">${v.label}</span>
+        </button>`;
+      }).join('');
+      body.innerHTML = `
+        <p style="margin:0 0 12px;font-size:13px;color:#444;">${subtitle}</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">${grid}</div>
+      `;
+      actions.innerHTML = `<button class="btn btn-secondary" onclick="cancelModal()">${firstTime ? 'Cancel' : 'Close'}</button>`;
+      modal.classList.add('show');
+    }
+
+    // One-shot hook: when the user picks a vessel from the FIRST-TIME
+    // prompt (triggered by Start GPS), we want to chain straight into
+    // startTracking() so they don't have to tap Start GPS twice.
+    let _vesselPickerThenStartTracking = false;
+
+    window.selectVessel = function(id) {
+      const v = VESSEL_ICONS.find(x => x.id === id);
+      if (!v) return;
+      setCurrentVessel(id);
+      // Update the persistent button in the action bar to reflect the new icon.
+      const btn = document.getElementById('vesselIconBtn');
+      if (btn) btn.textContent = v.emoji;
+      // If the user marker already exists on the map, swap its icon
+      // in place so they see the change immediately.
+      if (userMarker) {
+        const icon = L.divIcon({
+          className: '',
+          html: vesselIconHtml(v),
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+        });
+        userMarker.setIcon(icon);
+        userMarker.setPopupContent(`You are here (${v.label})`);
+      }
+      // Recolor the accuracy circle too so it stays consistent.
+      if (userAccuracyCircle) {
+        userAccuracyCircle.setStyle({ color: v.color, fillColor: v.color });
+      }
+      cancelModal();
+      // First-time flow: chain into startTracking if requested.
+      if (_vesselPickerThenStartTracking) {
+        _vesselPickerThenStartTracking = false;
+        if (watchId === null) startTracking();
+      }
+    };
 
     function showRescueModal() {
       const lat = (lastPos && lastPos.lat) || WINNI_CENTER[0];
@@ -3843,8 +3955,20 @@ ${tracks}
     function wireUI() {
       const startBtn = document.getElementById('startBtn');
       startBtn.addEventListener('click', () => {
-        if (watchId === null) startTracking();
-        else stopTracking();
+        if (watchId === null) {
+          // First-time prompt: if they haven't picked a vessel yet,
+          // show the picker. The picker chains into startTracking()
+          // via _vesselPickerThenStartTracking so the user doesn't
+          // have to tap Start GPS twice in a row.
+          if (!hasUserChosenVessel()) {
+            _vesselPickerThenStartTracking = true;
+            showVesselPickerModal();
+            return;
+          }
+          startTracking();
+        } else {
+          stopTracking();
+        }
       });
 
       // ----- Layers panel: collapsible, persisted, closes on outside-tap / Esc -----
@@ -3955,6 +4079,7 @@ ${tracks}
             Tap a ⚓ marina marker for hours, services, “Route to here”, and (when added) a phone link.<br>
             Tap 🆘 to see your exact lat/lng, nearest launch, nearest marina, and one-tap links to 911 / NH Marine Patrol / share-my-location.<br>
             Tap 🛶 to view, rename, export (GPX), or delete past trips.<br>
+            Tap the 🚤 boat icon to pick your vessel — the icon shown at your GPS location. 9 options from speedboat to mermaid. Your choice is saved locally and applied immediately.<br>
             Trips auto-record while GPS is on and auto-save when you stop.<br>
             Tap a shipped (orange) route line for label, distance, GPX export, and "Route to start" in Google Maps.
           </p>
@@ -4064,6 +4189,10 @@ ${tracks}
       // exists; was previously called eagerly at script-load time which
       // crashed the cache-render path on visit 2+.
       seedShippedRoutesIfNeeded();
+
+      // Sync the persistent vessel icon button to the user's saved choice.
+      const vesselBtn = document.getElementById('vesselIconBtn');
+      if (vesselBtn) vesselBtn.textContent = getCurrentVessel().emoji;
     });
   </script>
 </body>
