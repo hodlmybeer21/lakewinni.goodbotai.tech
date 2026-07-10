@@ -5,7 +5,7 @@
 
 ## TL;DR
 
-A single-file static web app (`index.html`, ~93 KB) that gives Winnipesaukee boaters a Garmin-HUD-style map with live GPS, crowdsourced buoys/hazards, NH GRANIT bathymetry (low-confidence reference), marina & fuel-dock locator, bridges & clearance (off by default), a "Where am I" rescue helper, and GPS trip logging with GPX export. No backend. Auto-deploys to Vercel on push to `main`.
+A single-file static web app (`index.html`, ~165 KB) that gives Winnipesaukee boaters a Garmin-HUD-style map with live GPS, crowdsourced buoys/hazards, NH GRANIT bathymetry (low-confidence reference), marina & fuel-dock locator, bridges & clearance (off by default), shipped recommended routes (cached locally from `data/winni-routes.json`), a "Where am I" rescue helper, and GPS trip logging with GPX export. No backend. Auto-deploys to Vercel on push to `main`.
 
 ## Identity
 
@@ -23,12 +23,14 @@ A single-file static web app (`index.html`, ~93 KB) that gives Winnipesaukee boa
 
 ```
 winni-map/
-├── index.html        ← ENTIRE APP. Single file, ~62 KB. HTML + CSS + JS.
+├── index.html        ← ENTIRE APP. Single file, ~165 KB. HTML + CSS + JS.
 ├── README.md         ← User-facing documentation
 ├── AGENTS.md         ← This file (session handoff)
 ├── vercel.json       ← Vercel config (static, root = index.html)
 ├── .gitignore
 ├── .vercel/          ← Vercel project metadata (auto)
+├── data/
+│   └── winni-routes.json   ← Shipped recommended routes (orange on map)
 └── scripts/          ← Build scripts (mostly archived; only `build-nowake-zones.py` remains but unused)
 ```
 
@@ -153,6 +155,8 @@ cd /root/.openclaw/workspace/projects/winni-map && git status --short && git log
 
 ## Recent commit history (for context)
 
+- `winni-shipped-routes-v1` — Add shipped recommended routes (data/winni-routes.json + separate localStorage key + orange solid render + GPX export + "Route to start" via Google Maps). Route 01: Moultonborough Bay → Wolfeboro Bay via The Broads (69 waypoints, captain-drawn).
+
 - `d925c6b` — Add Pier 19 (Tuftonboro) to marinas & fuel-dock layer (225 GJW Hwy, gas + groceries)
 - `a85040e` — Collapse layers panel into a chip by default
 - `2f3ec47` — Add Where-am-I rescue helper + Bridges & clearance layer
@@ -194,6 +198,14 @@ cd /root/.openclaw/workspace/projects/winni-map && git status --short && git log
 7. **The Trips layer uses `lineCap: 'round'` + `dashArray: '6, 6'`** for the dotted-line aesthetic. Don't change to solid.
 
 8. **localStorage quota is ~5 MB per origin.** NH GRANIT bathymetry GeoJSON is ~10 MB total, so we cache lines (3.7 MB) and bands (6.5 MB) separately in localStorage. If the quota is exceeded the cache write fails silently and re-fetches next session.
+
+9. **Shipped recommended routes (`data/winni-routes.json`) are SEPARATE from user finger-drawn routes.** Two storage keys, two layer functions, two modal functions:
+   - `winniRoutes` + `addRouteToLayer` + `openRouteActionsModal` = user finger-drawn (blue dashed, editable, deletable)
+   - `winniShippedRoutesV1` + `addShippedRouteToLayer` + `openShippedRouteModal` = shipped recommendations (orange solid, NOT editable, GPX-exportable, "Route to start" via Google Maps)
+   - Both render into the SAME `layers.routes` group and share the same `#layerRoutes` toggle. Don't split them into two toggles — the visual distinction (orange solid vs blue dashed) is enough.
+   - The shipped file is fetched on boot (`seedShippedRoutesIfNeeded`), cached with version flag `winniShippedRoutesSeedV1` matching `SHIPPED_ROUTES_VERSION`. Bump the version constant when the file shape changes (e.g. new required fields).
+   - The seed has no inline fallback (unlike buoys) because routes are hand-authored and a stale cache is better than a blank layer. On fetch failure, the cache renders and the version flag is NOT updated, so next visit retries.
+   - `computeRouteDistanceNm()` and `escapeHtml()` are hoisted function declarations shared by the modal + GPX export. Don't arrowify them — `openShippedRouteModal` is called from a Leaflet click handler that may execute before all `const` arrow initializers in the file have run.
 
 ## Contact
 

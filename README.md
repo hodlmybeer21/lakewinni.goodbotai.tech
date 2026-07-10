@@ -17,6 +17,7 @@ Live: **https://lakewinni.goodbotai.tech**
 - **Marinas & fuel docks** — ~40 marinas on the lake with services (gas, diesel, pump-out, moorings, etc.), season, and a "Route to here" button that drops a pin into Google Maps for turn-by-turn directions from your launch. Each popup carries a reference citation.
 - **Bridges & clearance** — low-clearance crossings (Wolfeboro Bay fixed truss, Lakeport drawbridge, etc.) with a **live clearance calculator** using the standard full-lake reference formula (`chart_clearance + 4.3 - lake_level`). Lake level is fetched from USGS 01080000 on boot, cached locally, with a manual override input always available in the popup.
 - **POIs (restaurants / hotels / groceries by boat)** — 27 directory-seeded entries across the lake's main dock towns, plus crowdsourced additions. Tap 📍 → 🍽 POI to add one anywhere on the lake.
+- **🧭 Shipped recommended routes** — captain-drawn channels baked into the app, fetched from `data/winni-routes.json` and cached locally. Rendered as **solid orange** lines (vs your finger-drawn routes which are **blue dashed**) so the two are visually distinct at a glance. Tap for label, distance, GPX export, or "Route to start" in Google Maps. First shipped route: Moultonborough Bay → Wolfeboro Bay via The Broads (69 waypoints, ~12 nm).
 - **🆘 Where-am-I rescue helper** — share lat/lng + nearest launch/marina with 911 / NH Marine Patrol in one tap.
 
 ## What it does NOT do (yet)
@@ -102,7 +103,8 @@ Data is fetched once from NH GRANIT/NHDES feature services and cached in localSt
 - [x] **v1.3** — NH GRANIT bathymetry reference layer ✅ shipped 2026-07-05
 - [x] **v1.4** — Bridge clearance markers + live clearance calculator (USGS lake level + standard full-lake reference formula) ✅ shipped 2026-07-07
 - [x] **v1.5** — POI layer (restaurants / hotels / groceries) + marina directory expansion (directory-seeded) ✅ shipped 2026-07-07
-- [ ] **v1.6** — Weather overlay (NOAA station at Wolfeboro)
+- [x] **v1.6** — Shipped recommended routes (orange) under the existing Routes toggle; click for label + GPX export + "Route to start" via Google Maps. First shipped route: Moultonborough Bay → Wolfeboro Bay via The Broads (69 waypoints). ✅ shipped 2026-07-10
+- [ ] **v1.7** — Weather overlay (NOAA station at Wolfeboro)
 - [ ] **v2.0** — Multi-user live tracking (backend, friends can see each other)
 
 ## License

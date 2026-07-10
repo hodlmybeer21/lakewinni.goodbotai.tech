@@ -4,9 +4,11 @@ Thumbs.db
 *.swp
 *.swo
 
-# Local dev artifacts
-data/
+# Local dev artifacts (ignore everything under data/ EXCEPT the shipped ships)
+data/*
+!data/.gitkeep
 !data/winni-buoys.json
+!data/winni-routes.json
 *.log
 
 # Vercel

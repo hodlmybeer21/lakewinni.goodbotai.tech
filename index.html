@@ -737,7 +737,7 @@
     </div>
     <div id="layers-body">
       <label class="layer-toggle"><input type="checkbox" id="layerBuoys" /> Buoys</label>
-      <label class="layer-toggle"><input type="checkbox" id="layerRoutes" /> Routes</label>
+      <label class="layer-toggle" title="Shipped recommendations (orange) + your finger-drawn routes (blue dashed)"><input type="checkbox" id="layerRoutes" /> Routes</label>
       <label class="layer-toggle"><input type="checkbox" id="layerLaunches" checked /> Launches</label>
       <label class="layer-toggle"><input type="checkbox" id="layerMarinas" checked /> Marinas &amp; fuel</label>
       <label class="layer-toggle"><input type="checkbox" id="layerBridges" /> Bridges &amp; clearance <small>(off by default)</small></label>
@@ -2818,6 +2818,180 @@
     // Hydrate routes into the layer now that state + layer are ready.
     loadRoutesIntoLayer();
 
+    // ----- Shipped recommended routes (loaded from data/winni-routes.json) -----
+    // Separate from storedRoutes (user finger-drawn). Cached in localStorage
+    // with a version key so updates redeploy cleanly. Rendered in the SAME
+    // `layers.routes` group but with a distinct visual (solid orange-red, no
+    // dash, thinner) so users can tell shipped recommendations apart from
+    // personal scratch routes.
+    const SHIPPED_ROUTES_VERSION = 1;
+    const SHIPPED_ROUTES_KEY = 'winniShippedRoutesV1';
+    const SHIPPED_ROUTES_FLAG_KEY = 'winniShippedRoutesSeedV1';
+
+    function getCachedShippedRoutes() {
+      try {
+        const flag = localStorage.getItem(SHIPPED_ROUTES_FLAG_KEY);
+        const cached = localStorage.getItem(SHIPPED_ROUTES_KEY);
+        if (flag === String(SHIPPED_ROUTES_VERSION) && cached) {
+          return JSON.parse(cached);
+        }
+      } catch (e) { /* ignore */ }
+      return null;
+    }
+
+    function cacheShippedRoutes(routes) {
+      try {
+        localStorage.setItem(SHIPPED_ROUTES_KEY, JSON.stringify(routes));
+        localStorage.setItem(SHIPPED_ROUTES_FLAG_KEY, String(SHIPPED_ROUTES_VERSION));
+      } catch (e) {
+        // Quota / private mode — silently skip; re-fetch on next visit.
+      }
+    }
+
+    function addShippedRouteToLayer(route) {
+      if (!route.points || route.points.length < 2) return;
+      const latlngs = route.points.map(p => [p.lat, p.lng]);
+      const line = L.polyline(latlngs, {
+        color: '#d94e1e',     // burnt orange-red — clearly different from user blue
+        weight: 3,
+        opacity: 0.9,
+        dashArray: null,      // solid line for "official" routes
+        interactive: true,
+      });
+      // Endpoints as small markers so users can see start/finish at a glance.
+      const startMarker = L.circleMarker(latlngs[0], {
+        radius: 5, color: '#16a34a', weight: 2, fillColor: '#16a34a', fillOpacity: 1,
+      }).bindTooltip(`Start: ${route.short_label || route.label || 'Route ' + route.section}`, { permanent: false });
+      const endMarker = L.circleMarker(latlngs[latlngs.length - 1], {
+        radius: 5, color: '#d94e1e', weight: 2, fillColor: '#d94e1e', fillOpacity: 1,
+      }).bindTooltip(`End: ${route.short_label || route.label || 'Route ' + route.section}`, { permanent: false });
+      line.on('click', e => {
+        L.DomEvent.stopPropagation(e);
+        openShippedRouteModal(route);
+      });
+      line.addTo(layers.routes);
+      startMarker.addTo(layers.routes);
+      endMarker.addTo(layers.routes);
+      route._line = line;
+      route._startMarker = startMarker;
+      route._endMarker = endMarker;
+    }
+
+    function openShippedRouteModal(route) {
+      const modal = document.getElementById('modal');
+      const body = document.getElementById('modalBody');
+      const actions = document.getElementById('modalActions');
+      const title = document.getElementById('modalTitle');
+      const titleText = route.label || `Route ${route.section || ''}`.trim();
+      title.textContent = `🧭 ${titleText}`;
+      const distNm = computeRouteDistanceNm(route.points);
+      const addedStr = route.added ? new Date(route.added).toLocaleDateString() : '—';
+      body.innerHTML = `
+        <p style="margin:0 0 8px;"><strong>Shipped recommended route</strong> — captain-drawn. ${route.points.length} waypoints · ${distNm.toFixed(1)} nm.</p>
+        <p style="margin:0 0 8px; font-size:12px; color:#666;">Added ${addedStr}${route.section ? ' · section ' + route.section : ''}.</p>
+        ${route.source ? `<p style="margin:0 0 8px; font-size:12px; color:#444;">${escapeHtml(route.source)}</p>` : ''}
+        <p style="margin:8px 0 0; padding:8px; background:#fff3cd; border:1px solid #ffeeba; border-radius:6px; font-size:12px; color:#856404;">
+          ⚠ Recreation aid — not for primary navigation. Always verify on an authoritative cruising chart and watch for posted buoys.
+        </p>
+      `;
+      const start = route.points[0];
+      const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${start.lat},${start.lng}&travelmode=driving`;
+      actions.innerHTML = `
+        <button class="btn btn-secondary" onclick="cancelModal()">Close</button>
+        <a class="btn btn-secondary" href="${gmaps}" target="_blank" rel="noopener">🧭 Route to start</a>
+        <button class="btn btn-primary" onclick="exportShippedRouteAsGpx('${route.id}')">💾 Export GPX</button>
+      `;
+      modal.classList.add('show');
+    }
+
+    function computeRouteDistanceNm(points) {
+      let totalM = 0;
+      for (let i = 1; i < points.length; i++) {
+        totalM += haversine(points[i-1].lat, points[i-1].lng, points[i].lat, points[i].lng);
+      }
+      return totalM / 1852; // meters → nautical miles
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      }[c]));
+    }
+
+    function exportShippedRouteAsGpx(routeId) {
+      const cached = getCachedShippedRoutes() || [];
+      const route = cached.find(r => r.id === routeId);
+      if (!route) return;
+      const name = (route.label || `Route ${route.section || route.id}`).replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'route';
+      const added = route.added ? new Date(route.added).toISOString() : new Date().toISOString();
+      const trkpts = route.points.map(p =>
+        `      <trkpt lat="${p.lat}" lon="${p.lng}"></trkpt>`
+      ).join('\n');
+      const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Winni Nav" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>${escapeHtml(name)}</name>
+    <time>${added}</time>
+  </metadata>
+  <trk>
+    <name>${escapeHtml(name)}</name>
+    <trkseg>
+${trkpts}
+    </trkseg>
+  </trk>
+</gpx>
+`;
+      const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `winni-route-${(route.section || route.id.slice(0,8))}.gpx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function loadShippedRoutesIntoLayer(routes) {
+      if (!Array.isArray(routes)) return;
+      routes.forEach(addShippedRouteToLayer);
+    }
+
+    async function seedShippedRoutesIfNeeded() {
+      // Render from cache immediately so the layer shows something on first paint,
+      // even before the network fetch completes.
+      const cached = getCachedShippedRoutes();
+      if (cached) loadShippedRoutesIntoLayer(cached);
+
+      // Then try to refresh from the shipped JSON. If the fetch fails (offline,
+      // CORS, file://), fall back to whatever's in cache. Don't mark seeded on
+      // failure — next visit will retry.
+      try {
+        const res = await fetch('data/winni-routes.json', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || !Array.isArray(data.routes)) return;
+        // Compare: if same version + same id set as cache, skip re-render.
+        const cachedIds = (cached || []).map(r => r.id).sort().join(',');
+        const freshIds = data.routes.map(r => r.id).sort().join(',');
+        if (cached && cachedIds === freshIds) {
+          cacheShippedRoutes(data.routes); // refresh timestamp
+          return;
+        }
+        // New / changed shipped routes — remove old shipped routes from layer, then re-add.
+        (cached || []).forEach(r => {
+          if (r._line) { try { layers.routes.removeLayer(r._line); } catch (_) {} }
+          if (r._startMarker) { try { layers.routes.removeLayer(r._startMarker); } catch (_) {} }
+          if (r._endMarker) { try { layers.routes.removeLayer(r._endMarker); } catch (_) {} }
+        });
+        cacheShippedRoutes(data.routes);
+        loadShippedRoutesIntoLayer(data.routes);
+      } catch (e) {
+        // Network blip — keep cached version visible.
+      }
+    }
+
+    // Kick off the shipped-routes fetch (async, non-blocking).
+    seedShippedRoutesIfNeeded();
+
     function enterRouteDrawMode() {
       routeDrawMode = true;
       document.getElementById('routeModeBtn').classList.add('active');
@@ -3721,7 +3895,7 @@ ${tracks}
       });
 
       document.getElementById('exportBtn').addEventListener('click', () => {
-        const payload = { buoys: storedBuoys, hazards: storedHazards, trips: storedTrips, depths: storedDepths, pois: storedPois, routes: storedRoutes };
+        const payload = { buoys: storedBuoys, hazards: storedHazards, trips: storedTrips, depths: storedDepths, pois: storedPois, routes: storedRoutes, shippedRoutes: (getCachedShippedRoutes() || []) };
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -3747,7 +3921,8 @@ ${tracks}
             Tap a ⚓ marina marker for hours, services, “Route to here”, and (when added) a phone link.<br>
             Tap 🆘 to see your exact lat/lng, nearest launch, nearest marina, and one-tap links to 911 / NH Marine Patrol / share-my-location.<br>
             Tap 🛶 to view, rename, export (GPX), or delete past trips.<br>
-            Trips auto-record while GPS is on and auto-save when you stop.
+            Trips auto-record while GPS is on and auto-save when you stop.<br>
+            Tap a shipped (orange) route line for label, distance, GPX export, and "Route to start" in Google Maps.
           </p>
           <p style="font-size:12px;color:#666;">
             <strong>Buoys saved locally:</strong> ${storedBuoys.length}<br>
@@ -3755,6 +3930,8 @@ ${tracks}
             <strong>Trips saved locally:</strong> ${storedTrips.length}<br>
             <strong>POIs saved locally:</strong> ${storedPois.length} (${storedPois.filter(p => p.seeded).length} directory-seeded)<br>
             <strong>Depth soundings saved locally:</strong> ${storedDepths.length}<br>
+            <strong>Your finger-drawn routes:</strong> ${storedRoutes.length}<br>
+            <strong>Shipped recommended routes:</strong> ${(getCachedShippedRoutes() || []).length} (cached locally).<br>
             <strong>Marinas in directory:</strong> ${MARINAS.length} (static reference data).<br>
             <strong>Bridges & clearance:</strong> ${BRIDGES.length} (off by default).<br>
             Use 💾 to export your data as JSON, or 🛶 to export trips as GPX.
