@@ -737,7 +737,7 @@
     </div>
     <div id="layers-body">
       <label class="layer-toggle"><input type="checkbox" id="layerBuoys" /> Buoys</label>
-      <label class="layer-toggle" title="Shipped recommendations (orange) + your finger-drawn routes (blue dashed)"><input type="checkbox" id="layerRoutes" checked /> Routes</label>
+      <label class="layer-toggle" title="Shipped recommendations (orange) + your finger-drawn routes (blue dashed)"><input type="checkbox" id="layerRoutes" /> Routes</label>
       <label class="layer-toggle"><input type="checkbox" id="layerLaunches" /> Launches</label>
       <label class="layer-toggle"><input type="checkbox" id="layerMarinas" /> Marinas &amp; fuel</label>
       <label class="layer-toggle"><input type="checkbox" id="layerBridges" /> Bridges &amp; clearance <small>(off by default)</small></label>
@@ -1587,15 +1587,11 @@
       storedDepths.forEach(d => addDepthToLayer(d));
 
       // Routes — finger-drawn channels (anonymous, dashed blue) + shipped
-      // recommended routes (orange). The Routes layer is the ONE data
-      // layer that ships ON by default (per Tyler's request) — shipped
-      // routes are the marquee feature and should be visible immediately
-      // on first visit. All other data layers stay off until toggled.
-      // Note: shipped routes are populated asynchronously after this
-      // (seedShippedRoutesIfNeeded runs after initMap returns), so this
-      // addTo() attaches an initially-empty group that fills in once
-      // the network fetch completes.
-      layers.routes = L.layerGroup().addTo(map);
+      // recommended routes (orange). Off by default — first-time visitors
+      // explore layers themselves. Shipped routes are populated
+      // asynchronously by seedShippedRoutesIfNeeded() after initMap
+      // returns; user toggles on with the Routes checkbox.
+      layers.routes = L.layerGroup();
 
       // NH GRANIT bathymetry — low-confidence reference.
       // Off by default. Layer objects created here; data loads lazily

@@ -44,7 +44,7 @@ winni-map/
 2. Tap **Start GPS** and grant location permission
 3. Your dot will start updating on the map
 
-> **First-time visitors: most data layers start OFF.** The Routes layer ships ON by default (shipped recommended channels are the marquee feature) along with the base map and island polygons. All other layers — Buoys, Hazards, Trips, Launches, Marinas, POIs, Bridges, NH Bathymetry — start off so you can turn each one on to see what it does. Tap the layer panel chip (top-right) to toggle.
+> **First-time visitors: all data layers (Buoys, Hazards, Trips, Launches, Marinas, POIs, Routes, Bridges, NH Bathymetry) start OFF.** Open the layer panel (top-right chip) and toggle each one on to explore. The base map + island polygons are always visible for orientation.
 
 ### Local development
 ```bash
