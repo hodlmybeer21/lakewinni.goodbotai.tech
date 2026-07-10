@@ -44,6 +44,8 @@ winni-map/
 2. Tap **Start GPS** and grant location permission
 3. Your dot will start updating on the map
 
+> **First-time visitors: all data layers (Buoys, Hazards, Trips, Launches, Marinas, POIs, Routes, Bridges, NH Bathymetry) start OFF.** Open the layer panel (top-right chip) and toggle each one on to explore. The base map + island polygons are always visible for orientation.
+
 ### Local development
 ```bash
 cd winni-map

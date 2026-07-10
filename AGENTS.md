@@ -207,6 +207,8 @@ cd /root/.openclaw/workspace/projects/winni-map && git status --short && git log
    - The seed has no inline fallback (unlike buoys) because routes are hand-authored and a stale cache is better than a blank layer. On fetch failure, the cache renders and the version flag is NOT updated, so next visit retries.
    - `computeRouteDistanceNm()` and `escapeHtml()` are hoisted function declarations shared by the modal + GPX export. Don't arrowify them — `openShippedRouteModal` is called from a Leaflet click handler that may execute before all `const` arrow initializers in the file have run.
 
+10. **All data layers start OFF on first visit (as of 2026-07-10).** Tyler wants first-time visitors to experience the layers one at a time. Don't re-add `checked` attributes to layer checkboxes or `.addTo(map)` calls in `initMap()`. Programmatic `checked = true` + `addTo(map)` IS allowed in user-triggered paths (saving a buoy, viewing a trip, entering route-draw mode, etc.) — the rule is only about the initial empty-map state. If you add a new layer, default it OFF. Only the base map (OSM tiles) and the always-on island orientation polygons render at boot.
+
 ## Contact
 
 If you break something, Tyler prefers you:
