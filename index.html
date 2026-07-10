@@ -449,6 +449,10 @@
     .poi-marker.restaurant { background: #e74c3c; }
     .poi-marker.hotel     { background: #8e44ad; }
     .poi-marker.grocery   { background: #27ae60; }
+    .poi-marker.sandbar   { background: #f5b041; }
+    .poi-marker.landmark  { background: #5d6d7e; }
+    .poi-marker.dive      { background: #1abc9c; }
+    .poi-marker.fishing   { background: #2980b9; }
     .poi-source {
       margin-top: 6px;
       padding: 5px 8px;
@@ -470,6 +474,10 @@
     .poi-cat-chip.restaurant { background: #fadbd8; color: #922b21; }
     .poi-cat-chip.hotel     { background: #e8daef; color: #6c3483; }
     .poi-cat-chip.grocery   { background: #d5f5e3; color: #1e8449; }
+    .poi-cat-chip.sandbar   { background: #fdebd0; color: #9c640c; }
+    .poi-cat-chip.landmark  { background: #d6dbdf; color: #34495e; }
+    .poi-cat-chip.dive      { background: #d1f2eb; color: #117864; }
+    .poi-cat-chip.fishing   { background: #d4e6f1; color: #1f618d; }
     .safety-banner {
       display: flex;
       flex-wrap: wrap;
@@ -743,7 +751,14 @@
       <label class="layer-toggle"><input type="checkbox" id="layerBridges" /> Bridges &amp; clearance <small>(off by default)</small></label>
       <label class="layer-toggle"><input type="checkbox" id="layerHazards" /> Hazards</label>
       <label class="layer-toggle"><input type="checkbox" id="layerTrips" /> Trips</label>
-      <label class="layer-toggle"><input type="checkbox" id="layerPois" /> POIs (restaurants, hotels, groceries)</label>
+      <label class="layer-toggle" style="font-weight:600;opacity:0.85;pointer-events:none;">POIs</label>
+      <label class="layer-toggle" style="padding-left:18px;"><input type="checkbox" id="layerPoisRestaurant" /> 🍽 Restaurants</label>
+      <label class="layer-toggle" style="padding-left:18px;"><input type="checkbox" id="layerPoisHotel" /> 🏨 Hotels</label>
+      <label class="layer-toggle" style="padding-left:18px;"><input type="checkbox" id="layerPoisGrocery" /> 🛒 Groceries</label>
+      <label class="layer-toggle" style="padding-left:18px;"><input type="checkbox" id="layerPoisSandbar" /> 🏖 Sandbars</label>
+      <label class="layer-toggle" style="padding-left:18px;"><input type="checkbox" id="layerPoisLandmark" /> 🏛 Landmarks</label>
+      <label class="layer-toggle" style="padding-left:18px;"><input type="checkbox" id="layerPoisDive" /> 🤿 Dive sites</label>
+      <label class="layer-toggle" style="padding-left:18px;"><input type="checkbox" id="layerPoisFishing" /> 🎣 Fishing spots</label>
       <label class="layer-toggle"><input type="checkbox" id="layerDepths" /> Depth soundings (yours)</label>
       <label class="layer-toggle"><input type="checkbox" id="layerBathy" /> NH Bathymetry <small>(ref.)</small></label>
     </div>
@@ -1480,7 +1495,14 @@
       bridges: null,       // static bridge / clearance layer
       buoys: null,
       trips: null,
-      pois: null,          // crowdsourced POIs (restaurants, hotels, groceries)
+      pois: null,          // crowdsourced POIs (legacy single-group placeholder; per-category groups are poisRestaurant/poisHotel/poisGrocery/poisSandbar/poisLandmark/poisDive/poisFishing)
+      poisRestaurant: null, // per-category POI layers (v4 split)
+      poisHotel: null,
+      poisGrocery: null,
+      poisSandbar: null,
+      poisLandmark: null,
+      poisDive: null,
+      poisFishing: null,
       depths: null,        // crowdsourced soundings
       bathyLines: null,    // NH GRANIT reference contours (lines)
       bathyBands: null,    // NH GRANIT reference depth bands (polygons)
@@ -1571,10 +1593,19 @@
       storedBuoys.forEach(b => addBuoyToLayer(b));
       // Off by default — first-time visitors explore layers themselves.
 
-      // Crowdsourced POIs (restaurants, hotels, groceries). Seed once per
-      // device from a 2014/2016 reference directory; user-added entries
-      // persist normally.
-      layers.pois = L.layerGroup();
+      // Crowdsourced POIs (restaurants, hotels, groceries, sandbars,
+      // landmarks, dive sites, fishing spots). Seed once per device from
+      // the directory + Tyler reference; user-added entries persist normally.
+      // Each POI routes to a per-category layerGroup so the layer panel can
+      // toggle categories independently. Unknown categories fall through
+      // to `layers.poisRestaurant` as a safety net.
+      layers.poisRestaurant = L.layerGroup();
+      layers.poisHotel      = L.layerGroup();
+      layers.poisGrocery    = L.layerGroup();
+      layers.poisSandbar    = L.layerGroup();
+      layers.poisLandmark   = L.layerGroup();
+      layers.poisDive       = L.layerGroup();
+      layers.poisFishing    = L.layerGroup();
       seedPoisIfNeeded();
       storedPois.forEach(p => addPoiToLayer(p));
       // Off by default — first-time visitors explore layers themselves.
@@ -1683,13 +1714,29 @@
     // Seed data lives in `POI_SEED` below. On first load (or after a wipe)
     // it gets merged into storedPois exactly once per device; user-added
     // POIs persist normally.
-    const POI_TYPES = {
-      restaurant: { label: 'Restaurant', icon: '🍽', cls: 'restaurant' },
-      hotel:      { label: 'Hotel / motel', icon: '🏨', cls: 'hotel' },
-      grocery:    { label: 'Grocery / store', icon: '🛒', cls: 'grocery' },
+    // POI_TYPES is the single source of truth for category metadata. Each entry
+// drives: marker icon + color (via .poi-marker.<cls> CSS), the "Add POI"
+// category dropdown, the per-category layer toggle label, and the popup
+// category chip. Adding a new category means:
+//   1. Add an entry here with label, icon, cls, layerLabel.
+//   2. Add a matching .poi-marker.<cls> + .poi-cat-chip.<cls> CSS rule.
+//   3. Add a <label class="layer-toggle"> in the layer panel with id
+//      `layerPois<CapitalizedCls>`.
+//   4. Add a `layers.pois<CapitalizedCls>` layerGroup init in initMap().
+//   5. Add a per-category event listener that adds/removes the layer.
+// The category also becomes a real localStorage-stable value: any seeded
+// or user-added POI with this `cat` will auto-route to the new layer.
+const POI_TYPES = {
+      restaurant: { label: 'Restaurant', icon: '🍽', cls: 'restaurant', layerLabel: '🍽 Restaurants' },
+      hotel:      { label: 'Hotel / motel', icon: '🏨', cls: 'hotel', layerLabel: '🏨 Hotels' },
+      grocery:    { label: 'Grocery / store', icon: '🛒', cls: 'grocery', layerLabel: '🛒 Groceries' },
+      sandbar:    { label: 'Sandbar', icon: '🏖', cls: 'sandbar', layerLabel: '🏖 Sandbars' },
+      landmark:   { label: 'Landmark', icon: '🏛', cls: 'landmark', layerLabel: '🏛 Landmarks' },
+      dive:       { label: 'Dive site', icon: '🤿', cls: 'dive', layerLabel: '🤿 Dive sites' },
+      fishing:    { label: 'Fishing spot', icon: '🎣', cls: 'fishing', layerLabel: '🎣 Fishing spots' },
     };
 
-    const POI_SEED_VERSION = '3';
+    const POI_SEED_VERSION = '4';
     const POI_SEED_FLAG_KEY = 'winniPoisV1Seeded';
 
     // Verified buoys seed (Tyler Hudson, 2026-07-08; 41 added 2026-07-09 = 480 total).
@@ -1741,6 +1788,15 @@
     // Directory-seeded POIs. Coordinates come from the nearest entry in
     // LAUNCHES[] (which has authoritative coords). The popup keeps the
     // exact directory phrasing + grid ref so users can verify on the chart.
+    // v4 added four new categories — sandbar, landmark, dive, fishing —
+    // sourced from Tyler's "100 Notable Places" doc (2026-07-10). Those
+    // entries use approximate coords (per the doc's own caveat) and follow
+    // rule #13's protocol: source citation + approximate note + section
+    // comment. The Dive (sandbar #47 in the doc) is intentionally NOT in
+    // the sandbar seed — The Dive POI is already shipped separately and
+    // anchors the same spot. Braun Bay (#46) is also skipped because the
+    // doc says "site of a lawsuit over a floating restaurant" — needs its
+    // own discussion before adding.
     const POI_SEED = [
       // ---- Wolfeboro (public docks area, 43.5837565, -71.2122564) ----
       { cat: 'restaurant', lat: 43.5837565, lng: -71.2122564,
@@ -1879,6 +1935,209 @@
         name: 'Colonial Pines Cottages (Moultonborough)',
         note: 'Moultonborough. hotel directory (2016).',
         source: 'Lake Winnipesaukee hotel directory (2016): "Colonial Pines Cottages"' },
+
+      // =========================================================================
+      // v4 additions — sourced from Tyler's "100 Notable Places" doc (2026-07-10)
+      // =========================================================================
+      // All coords flagged "approximate" in the note per rule #13. The doc's own
+      // header caveat: "Informal spots \u2014 sandbars, coves, dive wrecks,
+      // anchorages \u2014 don't have official GPS listings, so those coordinates
+      // are best-estimate centerpoints good enough to get you into the right
+      // cove." Section headers below mirror the doc's groupings.
+
+      // ---- SANDBARS (#46, #48-51; skipping #47 = The Dive, already shipped) ----
+      // Braun Bay (#46) skipped: doc notes "site of a lawsuit over a floating
+      // restaurant that anchors there" \u2014 needs its own discussion.
+      { cat: 'sandbar', lat: 43.5850, lng: -71.4950,
+        name: 'Paugus Bay Sandbar',
+        note: 'Near the Margate. Gradual slope, sandy to 8 ft, can get choppy from boat traffic. Coordinates approximate \u2014 verify on chart.',
+        source: 'Tyler reference list 2026-07-10 item #48: "Paugus Bay Sandbar (near the Margate) \u2014 approx. 43.585, -71.495"' },
+      { cat: 'sandbar', lat: 43.6500, lng: -71.4600,
+        name: 'Patrician Shores Sandbar',
+        note: 'Meredith, west of Two Mile Island. Quieter than Braun Bay; watch for rocks. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #49: "Patrician Shores Sandbar \u2014 approx. 43.6500, -71.4600 (Meredith, west of Two Mile Island)"' },
+      { cat: 'sandbar', lat: 43.5100, lng: -71.5300,
+        name: 'Lake Winnisquam Sandbar',
+        note: 'A second, smaller sandbar scene just off the main lake (technically Lake Winnisquam). Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #50: "Lake Winnisquam sandbar \u2014 approx. 43.510, -71.530"' },
+      { cat: 'sandbar', lat: 43.6850, lng: -71.4550,
+        name: 'Farrar Point Shoal',
+        note: 'Center Harbor. Sandy, shoals quickly; sailors favor it for the easy broad-reach exit. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #51: "Farrar Point shoal, Center Harbor \u2014 approx. 43.685, -71.455"' },
+
+      // ---- LANDMARKS — Historic Sites (#1-11) ----
+      { cat: 'landmark', lat: 43.6011, lng: -71.5069,
+        name: 'Endicott Rock State Historic Site',
+        note: 'Weirs Beach, Laconia. Boulder carved in 1652 by Massachusetts Bay Colony surveyors \u2014 earliest documented European incursion into the region. Coordinates precise (state historic site).',
+        source: 'Tyler reference list 2026-07-10 item #1: "Endicott Rock State Historic Site \u2014 43.6011, -71.5069 (Weirs Beach, Laconia)"' },
+      { cat: 'landmark', lat: 43.5478, lng: -71.4064,
+        name: 'Kimball Castle ruins (Smith Cove)',
+        note: 'Stone mansion built for a railroad tycoon; the Lady of the Lake steamer was beached here to house the stonemasons who built it. Coordinates precise (named landmark).',
+        source: 'Tyler reference list 2026-07-10 item #2: "Kimball Castle ruins / Smith (Glendale) Cove \u2014 43.5478, -71.4064"' },
+      { cat: 'landmark', lat: 43.4483, lng: -71.2200,
+        name: 'Original Alton Bay steamboat terminus',
+        note: 'Home port of the S.S. Mount Washington from 1872, carrying thousands of summer passengers for 67 years. Coordinates precise.',
+        source: 'Tyler reference list 2026-07-10 item #3: "Original Alton Bay steamboat terminus \u2014 43.4483, -71.2200"' },
+      { cat: 'landmark', lat: 43.6019, lng: -71.5075,
+        name: 'Weirs Beach railroad depot & boardwalk',
+        note: 'Historic rail-to-steamer transfer point; visitors arrived by train and boarded steamers here starting in the 1850s. Coordinates precise.',
+        source: 'Tyler reference list 2026-07-10 item #4: "Weirs Beach railroad depot & boardwalk \u2014 43.6019, -71.5075"' },
+      { cat: 'landmark', lat: 43.5450, lng: -71.3650,
+        name: 'Cow Island (Guernsey Island) historic site',
+        note: 'Once used to quarantine Guernsey cattle imported from Europe starting in 1831; a working grist mill once stood here. Coordinates precise.',
+        source: 'Tyler reference list 2026-07-10 item #5: "Cow Island (Guernsey Island) \u2014 43.545, -71.365"' },
+      { cat: 'landmark', lat: 43.6010, lng: -71.5070,
+        name: 'Lake Winnipesaukee Historical Society Museum',
+        note: 'Weirs Beach. Local maritime and lake history, including artifacts from the steamboat era. Coordinates precise (museum).',
+        source: 'Tyler reference list 2026-07-10 item #6: "Lake Winnipesaukee Historical Society Museum \u2014 43.601, -71.507 (Weirs Beach)"' },
+      { cat: 'landmark', lat: 43.5880, lng: -71.1990,
+        name: 'The Libby Museum',
+        note: 'Tuftonboro, Rt. 109. Natural history museum holding preserved specimens of the rattlesnakes once found on Rattlesnake Island. Coordinates precise.',
+        source: 'Tyler reference list 2026-07-10 item #7: "The Libby Museum \u2014 43.588, -71.199 (Tuftonboro, Rt. 109)"' },
+      { cat: 'landmark', lat: 43.5661, lng: -71.2875,
+        name: 'Rattlesnake Island',
+        note: 'Alton. The lake\u2019s highest island; snakes were eliminated via introduced razorback hogs in the early 1900s. Also the fictional site of a private spaceship launchpad in The Expanse. Coordinates precise.',
+        source: 'Tyler reference list 2026-07-10 item #8: "Rattlesnake Island \u2014 43.5661, -71.2875 (Alton)"' },
+      { cat: 'landmark', lat: 43.6380, lng: -71.4350,
+        name: '"The Witches"',
+        note: 'East of Governors Island. Submerged rock field \u2014 once an island, eroded down after the dam raised lake levels; has claimed countless props and hulls. A hazard, but a genuinely interesting piece of lake lore. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #9: "The Witches \u2014 approx. 43.638, -71.435"' },
+      { cat: 'landmark', lat: 43.6810, lng: -71.4580,
+        name: 'Center Harbor first Harvard-Yale Regatta site',
+        note: 'Site of the first intercollegiate sporting event in the U.S. (Harvard vs. Yale, 1852), reenacted on its centennial in 1952. Coordinates precise.',
+        source: 'Tyler reference list 2026-07-10 item #10: "Center Harbor / first Harvard-Yale Regatta site \u2014 43.681, -71.458"' },
+      { cat: 'landmark', lat: 43.6010, lng: -71.5070,
+        name: 'Old Acquadocton village site (The Weirs)',
+        note: 'Former fishing village of the Winnipesaukee band of the Pennacook, named for the stone fish weirs still visible when the channel was dredged. Coordinates precise.',
+        source: 'Tyler reference list 2026-07-10 item #11: "Old Acquadocton village site (The Weirs) \u2014 43.601, -71.507"' },
+
+      // ---- LANDMARKS — Scenic Viewpoints (#85-91) ----
+      { cat: 'landmark', lat: 43.5800, lng: -71.3400,
+        name: 'The Broads',
+        note: 'Center of the lake. The wide, island-free heart of Winnipesaukee \u2014 cut the engine and drift for open sunset views framed by the Ossipee and Belknap ranges. Coordinates approximate (open water).',
+        source: 'Tyler reference list 2026-07-10 item #85: "The Broads \u2014 center of the lake, approx. 43.58, -71.34"' },
+      { cat: 'landmark', lat: 43.6050, lng: -71.3650,
+        name: 'Saunders Bay / Governors Island Bridge',
+        note: 'Gilford. Sheltered pocket with good late-day light. Coordinates precise.',
+        source: 'Tyler reference list 2026-07-10 item #86: "Saunders Bay / Governors Island Bridge \u2014 43.605, -71.365 (Gilford)"' },
+      { cat: 'landmark', lat: 43.5500, lng: -71.3000,
+        name: 'Rattlesnake Island silhouette view',
+        note: 'Best seen from the Broads looking north. Coordinates approximate (open water vantage).',
+        source: 'Tyler reference list 2026-07-10 item #87: "Rattlesnake Island silhouette view \u2014 best seen from the Broads looking north, approx. 43.55, -71.30"' },
+      { cat: 'landmark', lat: 43.4780, lng: -71.2880,
+        name: 'Mount Major summit view',
+        note: 'Alton. Classic panoramic overlook of the entire southern lake and its islands. By trail, not boat \u2014 but visible from water. Coordinates precise (mountain summit).',
+        source: 'Tyler reference list 2026-07-10 item #88: "Mount Major summit view \u2014 43.478, -71.288 (Alton)"' },
+      { cat: 'landmark', lat: 43.7200, lng: -71.3700,
+        name: 'Red Hill fire tower overlook',
+        note: 'Moultonborough/Center Harbor. Unparalleled views of Winnipesaukee, Squam, and the surrounding ranges. Coordinates precise (mountain summit).',
+        source: 'Tyler reference list 2026-07-10 item #89: "Red Hill fire tower overlook \u2014 43.720, -71.370 (Moultonborough/Center Harbor)"' },
+      { cat: 'landmark', lat: 43.7400, lng: -71.3500,
+        name: 'Castle in the Clouds viewpoint',
+        note: 'Moultonborough. Mountainside estate with sweeping lake views, 28+ miles of trails. Coordinates precise.',
+        source: 'Tyler reference list 2026-07-10 item #90: "Castle in the Clouds viewpoint \u2014 43.740, -71.350 (Moultonborough)"' },
+      { cat: 'landmark', lat: 43.5350, lng: -71.3500,
+        name: 'Gunstock Mountain overlook',
+        note: 'Gilford. Lake and mountain views from the ski area\u2019s summer trails. Coordinates precise.',
+        source: 'Tyler reference list 2026-07-10 item #91: "Gunstock Mountain overlook \u2014 43.535, -71.350 (Gilford)"' },
+
+      // ---- LANDMARKS — Curiosities (#103-105) ----
+      { cat: 'landmark', lat: 43.5780, lng: -71.3680,
+        name: '"The Forties" island cluster',
+        note: 'Tight group of tiny named islands (Round, Pop, Fish, LeRoy, Crescent, Saints Rest, Kinneho, Breezy) between Mark and Welch Islands \u2014 fun to thread through slowly by kayak or small boat. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #103: "The Forties island cluster \u2014 approx. 43.578, -71.368"' },
+      { cat: 'landmark', lat: 43.5480, lng: -71.3620,
+        name: 'The Hole in the Wall (Cow Island Gut)',
+        note: 'Narrow passage between Cow Island and Little Bear Island, historically used as a protected cut-through. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #104: "The Hole in the Wall (Cow Island Gut) \u2014 approx. 43.548, -71.362"' },
+      { cat: 'landmark', lat: 43.6010, lng: -71.5070,
+        name: 'M/V Sophie C. mail boat route',
+        note: 'Departs Weirs Beach. One of only two floating U.S. post offices left in the country; you can ride along as it delivers mail to eight lake islands. Coordinates precise (dock).',
+        source: 'Tyler reference list 2026-07-10 item #105: "M/V Sophie C. mail boat route \u2014 departs Weirs Beach, 43.601, -71.507"' },
+
+      // ---- DIVE SITES (#36-45) ----
+      { cat: 'dive', lat: 43.5480, lng: -71.4060,
+        name: 'Lady of the Lake wreck',
+        note: 'Smith/Glendale Cove. 1848-built side-wheel steamer, scuttled 1895, rests upright in 30 ft of water \u2014 the most popular dive site on the lake. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #36: "Lady of the Lake wreck \u2014 approx. 43.548, -71.406 (Smith/Glendale Cove)"' },
+      { cat: 'dive', lat: 43.6000, lng: -71.5050,
+        name: 'Steam barge wreck, Doe Point',
+        note: 'Near Weirs Beach. Turn-of-the-century pile-driving barge in ~45-50 ft of water; crane and boiler still attached. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #37: "Steam barge wreck, Doe Point \u2014 approx. 43.600, -71.505"' },
+      { cat: 'dive', lat: 43.5860, lng: -71.3110,
+        name: '"Empty Pockets" cabin cruiser',
+        note: 'Off NW Diamond Island. 28-ft twin-engine cruiser, sank late 1970s, in ~55 ft of water. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #38: "Empty Pockets cabin cruiser \u2014 off NW Diamond Island, approx. 43.586, -71.311"' },
+      { cat: 'dive', lat: 43.5850, lng: -71.3090,
+        name: 'Diamond Island Dory',
+        note: '19-ft boat in ~35 ft of water, reportedly still tied by tow line to Empty Pockets. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #39: "Diamond Island Dory \u2014 approx. 43.585, -71.309"' },
+      { cat: 'dive', lat: 43.5860, lng: -71.3110,
+        name: 'Navy laser-test rail track, Diamond Island',
+        note: 'NW side. 1950s SCRIPTS program track for measuring laser transmission through water \u2014 an odd piece of Cold War history in ~25 ft of water. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #40: "Navy laser-test rail track, Diamond Island \u2014 approx. 43.586, -71.311"' },
+      { cat: 'dive', lat: 43.4550, lng: -71.2200,
+        name: 'Echo Junior race boat wreck, Loon Cove',
+        note: 'Alton Bay. 1940s 28-ft racer with a 12-cylinder Allison aircraft engine; burned to the waterline on its maiden voyage. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #41: "Echo Junior race boat wreck, Loon Cove \u2014 approx. 43.455, -71.220 (Alton Bay)"' },
+      { cat: 'dive', lat: 43.5950, lng: -71.3300,
+        name: 'Laker Wrecks, Ship & Moose Islands',
+        note: 'Three wrecks between 10-37 ft, surrounded by rock ledges dropping past 100 ft. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #42: "Laker Wrecks, Ship & Moose Islands \u2014 approx. 43.595, -71.330"' },
+      { cat: 'dive', lat: 43.5800, lng: -71.3200,
+        name: 'Parker Island rock formations',
+        note: 'Glacially carved tunnels and quartz-veined ledges forming an underwater staircase from 15 to 60 ft. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #43: "Parker Island rock formations \u2014 approx. 43.580, -71.320"' },
+      { cat: 'dive', lat: 43.4700, lng: -71.2550,
+        name: 'Rum Point (West Alton) rock walls',
+        note: 'Dramatic underwater rock formations and a 1965 sunken logging truck; a Prohibition-era rum shipment is rumored lost nearby. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #44: "Rum Point (West Alton) rock walls \u2014 approx. 43.470, -71.255"' },
+      { cat: 'dive', lat: 43.5900, lng: -71.3250,
+        name: 'Goodhue & Hawkins Navy Yard debris field',
+        note: 'Decades of sunken hulls, barges, and engines from the old boatyard\u2019s operations. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #45: "Goodhue & Hawkins Navy Yard debris field \u2014 approx. 43.590, -71.325"' },
+
+      // ---- FISHING HOTSPOTS (#71-80) ----
+      { cat: 'fishing', lat: 43.4500, lng: -71.2200,
+        name: 'Alton Bay shallows',
+        note: 'Weedy, shallow \u2014 prime smallmouth bass and pickerel water. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #71: "Alton Bay shallows \u2014 43.450, -71.220"' },
+      { cat: 'fishing', lat: 43.5850, lng: -71.2050,
+        name: 'Wolfeboro Bay',
+        note: 'Rocky structure \u2014 smallmouth bass and landlocked salmon. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #72: "Wolfeboro Bay \u2014 43.585, -71.205"' },
+      { cat: 'fishing', lat: 43.7400, lng: -71.4300,
+        name: 'Lees Mills',
+        note: 'Moultonborough. Largemouth bass water near the Loon Center; good shoreline access. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #73: "Lees Mills \u2014 43.740, -71.430 (Moultonborough)"' },
+      { cat: 'fishing', lat: 43.7200, lng: -71.4600,
+        name: 'The Basin',
+        note: 'Moultonborough Bay. Largemouth bass. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #74: "The Basin \u2014 43.720, -71.460 (Moultonborough Bay)"' },
+      { cat: 'fishing', lat: 43.7350, lng: -71.4500,
+        name: 'Green\u2019s Basin',
+        note: 'Moultonborough. Largemouth bass, shallow weedy structure. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #75: "Green\u2019s Basin \u2014 43.735, -71.450 (Moultonborough)"' },
+      { cat: 'fishing', lat: 43.7000, lng: -71.4200,
+        name: 'Salmon Meadow',
+        note: 'Largemouth bass habitat named for what it isn\u2019t (a good local irony). Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #76: "Salmon Meadow \u2014 43.700, -71.420"' },
+      { cat: 'fishing', lat: 43.6850, lng: -71.4600,
+        name: 'Center Harbor / Moultonborough shoals',
+        note: 'Fastest-warming water in spring \u2014 noted by lake guides as the best early-season smallmouth jerkbait bite. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #77: "Center Harbor/Moultonborough shoals \u2014 43.685, -71.460"' },
+      { cat: 'fishing', lat: 43.5600, lng: -71.4200,
+        name: 'Deep winter holes, south-central lake',
+        note: '100+ ft basins where bass and lake trout hold through winter \u2014 a top ice-fishing zone. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #78: "Deep winter holes, south-central lake \u2014 approx. 43.560, -71.420"' },
+      { cat: 'fishing', lat: 43.5830, lng: -71.2020,
+        name: 'Wolfeboro town docks (Smith River mouth)',
+        note: 'Where the Smith River enters the lake \u2014 reliable current-fed fishing. Coordinates precise.',
+        source: 'Tyler reference list 2026-07-10 item #79: "Wolfeboro town docks (Smith River mouth) \u2014 43.583, -71.202"' },
+      { cat: 'fishing', lat: 43.5850, lng: -71.4950,
+        name: 'Paugus Bay',
+        note: 'Mixed bass and panfish water, heavily trafficked by boats. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-10 item #80: "Paugus Bay \u2014 43.585, -71.495"' },
     ];
 
     function seedPoisIfNeeded() {
@@ -1944,9 +2203,25 @@
       `;
     }
 
+    function poiLayerFor(cat) {
+      // Map a POI category to its per-category layerGroup. Unknown cats
+      // fall through to `layers.poisRestaurant` so user-added POIs with a
+      // typo'd cat still render (and the user can still delete them).
+      const map = {
+        restaurant: layers.poisRestaurant,
+        hotel:      layers.poisHotel,
+        grocery:    layers.poisGrocery,
+        sandbar:    layers.poisSandbar,
+        landmark:   layers.poisLandmark,
+        dive:       layers.poisDive,
+        fishing:    layers.poisFishing,
+      };
+      return map[cat] || layers.poisRestaurant;
+    }
+
     function addPoiToLayer(p) {
       L.marker([p.lat, p.lng], { icon: poiIcon(p.cat), title: p.name })
-        .addTo(layers.pois)
+        .addTo(poiLayerFor(p.cat))
         .bindPopup(poiPopupHTML(p));
     }
 
@@ -1970,7 +2245,13 @@
     };
 
     function rebuildPoiLayer() {
-      layers.pois.clearLayers();
+      // Clear every per-category POI layer, then re-add from storage.
+      Object.values(layers).filter(l => l && l.clearLayers && (
+        l === layers.poisRestaurant || l === layers.poisHotel ||
+        l === layers.poisGrocery   || l === layers.poisSandbar ||
+        l === layers.poisLandmark  || l === layers.poisDive    ||
+        l === layers.poisFishing
+      )).forEach(l => l.clearLayers());
       storedPois.forEach(p => addPoiToLayer(p));
     }
 
@@ -2701,9 +2982,14 @@
         seeded: false,
       };
       addPoi(poi);
-      // Make sure POI layer is on so user sees their addition
-      document.getElementById('layerPois').checked = true;
-      layers.pois.addTo(map);
+      // Make sure the matching per-category POI layer is on so the user
+      // sees their addition. Unknown cats fall through to restaurant.
+      const toggleId = 'layerPois' + (cat.charAt(0).toUpperCase() + cat.slice(1));
+      const toggle = document.getElementById(toggleId);
+      if (toggle) {
+        toggle.checked = true;
+        poiLayerFor(cat).addTo(map);
+      }
       cancelModal();
       exitBuoyMode();
     };
@@ -4076,7 +4362,7 @@ ${tracks}
           <p><strong>Recreation aid — not for primary navigation.</strong></p>
           <p>Always defer to official charts, visual markers, and NH Marine Patrol buoys.</p>
           <p style="font-size:12px;color:#666;">
-            Layers: buoys (community-contributed), hazards (community-contributed), public launches, marinas & fuel docks, bridges & clearance (off by default — verify before transit), past trips, POIs (restaurants / hotels / groceries, directory-seeded + community), crowdsourced depth soundings, and NH GRANIT bathymetry (reference only).<br>
+            Layers: buoys (community-contributed), hazards (community-contributed), public launches, marinas & fuel docks, bridges & clearance (off by default — verify before transit), past trips, POIs (restaurants / hotels / groceries / sandbars / landmarks / dive sites / fishing spots — directory-seeded + community), crowdsourced depth soundings, and NH GRANIT bathymetry (reference only).<br>
             Data sources: Roche Realty launch list, NH GRANIT/NHDES bathymetry, Lake Winnipesaukee marina directory (reference), Lake Winnipesaukee POI directory (2014–2016), OpenStreetMap base map.<br>
             Tap 📍 then tap the map to add a buoy, hazard, POI, or depth sounding — pick which in the popup.<br>
             Tap a ⚓ marina marker for hours, services, “Route to here”, and (when added) a phone link.<br>
@@ -4134,9 +4420,28 @@ ${tracks}
         if (e.target.checked) layers.trips.addTo(map);
         else map.removeLayer(layers.trips);
       });
-      document.getElementById('layerPois').addEventListener('change', e => {
-        if (e.target.checked) layers.pois.addTo(map);
-        else map.removeLayer(layers.pois);
+      // Per-category POI layer toggles. The single `layerPois` checkbox from v3
+      // was replaced by one toggle per category in v4 so users can show
+      // sandbars without showing every restaurant. To add a new POI
+      // category, follow the 5-step checklist in the POI_TYPES comment
+      // block AND wire a listener here using `poiLayerFor('cat')`.
+      const poiToggleBindings = [
+        ['layerPoisRestaurant', 'restaurant'],
+        ['layerPoisHotel',      'hotel'],
+        ['layerPoisGrocery',    'grocery'],
+        ['layerPoisSandbar',    'sandbar'],
+        ['layerPoisLandmark',   'landmark'],
+        ['layerPoisDive',       'dive'],
+        ['layerPoisFishing',    'fishing'],
+      ];
+      poiToggleBindings.forEach(([id, cat]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', e => {
+          const lyr = poiLayerFor(cat);
+          if (e.target.checked) lyr.addTo(map);
+          else map.removeLayer(lyr);
+        });
       });
       document.getElementById('layerDepths').addEventListener('change', e => {
         if (e.target.checked) layers.depths.addTo(map);
