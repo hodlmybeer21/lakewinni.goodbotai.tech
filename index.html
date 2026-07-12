@@ -3962,12 +3962,22 @@ ${tracks}
       if (!('geolocation' in navigator)) {
         setGpsStatus('GPS unsupported', 'err');
         console.error('[winni-trip] geolocation not supported in this browser');
+        showToast('GPS not supported in this browser.');
         return;
       }
       setGpsStatus('Acquiring GPS…', 'acquiring');
       // Start a fresh trip recording for this session
       startNewTrip();
       console.log('[winni-trip] startTracking: trip started, currentTrip.id=', currentTrip && currentTrip.id);
+      // Proactively request a single fix first. On iOS Safari this triggers
+      // the "Allow location for this website?" prompt if permission hasn't
+      // been granted yet. If the user denies, we hear about it immediately
+      // instead of waiting forever for watchPosition to silently fail.
+      navigator.geolocation.getCurrentPosition(
+        () => { console.log('[winni-trip] getCurrentPosition: permission OK, watchPosition should now deliver fixes'); },
+        (err) => { console.warn('[winni-trip] getCurrentPosition failed:', err.code, err.message); },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      );
       watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
         enableHighAccuracy: true,
         maximumAge: 1000,
@@ -3980,6 +3990,33 @@ ${tracks}
       if (window.DeviceOrientationEvent) {
         window.addEventListener('deviceorientation', onOrient);
       }
+
+      // Keep the screen awake while tracking. Screen Wake Lock API is
+      // supported on iOS 16.4+ Safari and modern Chrome. Without this, the
+      // screen can lock and iOS Safari pauses geolocation updates.
+      requestWakeLock();
+    }
+
+    let _wakeLock = null;
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          _wakeLock = await navigator.wakeLock.request('screen');
+          console.log('[winni-trip] screen wake lock acquired');
+          _wakeLock.addEventListener('release', () => {
+            console.log('[winni-trip] screen wake lock released (screen may be off)');
+          });
+        } else {
+          console.log('[winni-trip] Wake Lock API not supported — screen may lock during trip');
+        }
+      } catch (err) {
+        console.warn('[winni-trip] wake lock request failed:', err);
+      }
+    }
+    function releaseWakeLock() {
+      try {
+        if (_wakeLock) { _wakeLock.release(); _wakeLock = null; }
+      } catch (_) {}
     }
 
     function stopTracking() {
@@ -4001,6 +4038,7 @@ ${tracks}
       document.getElementById('speed').textContent = '0.0';
       document.getElementById('heading').textContent = '—';
       window.removeEventListener('deviceorientation', onOrient);
+      releaseWakeLock();
 
       // Finish the trip. finishTrip() always returns a result object:
       //   { ok: true, trip }             — saved (>=1 point), prompt to name
@@ -4183,7 +4221,13 @@ ${tracks}
     }
 
     function onPosErr(err) {
-      setGpsStatus(`GPS error: ${err.message}`, 'err');
+      console.error('[winni-trip] onPosErr:', err.code, err.message, '(1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT)');
+      // Map error codes to user-friendly messages
+      let msg = err.message || 'GPS error';
+      if (err.code === 1) msg = 'Location permission denied — enable in browser/site settings';
+      else if (err.code === 2) msg = 'GPS position unavailable — check Location Services';
+      else if (err.code === 3) msg = 'GPS timed out — poor signal or no fix';
+      setGpsStatus(`GPS error: ${msg}`, 'err');
     }
 
     function onOrient(e) {
