@@ -1689,7 +1689,7 @@
       grocery:    { label: 'Grocery / store', icon: '🛒', cls: 'grocery' },
     };
 
-    const POI_SEED_VERSION = '3';
+    const POI_SEED_VERSION = '4';
     const POI_SEED_FLAG_KEY = 'winniPoisV1Seeded';
 
     // Verified buoys seed (Tyler Hudson, 2026-07-08; 41 added 2026-07-09 = 480 total).
@@ -1860,19 +1860,20 @@
         note: 'Tuftonboro. hotel directory (2016).',
         source: 'Lake Winnipesaukee hotel directory (2016): "Sunset Lodges; Tuftonboro"' },
 
-      // ---- West Alton (Smalls Cove Sandbar, ~43.470 -71.260) ----
+      // ---- West Alton (Smalls Cove Sandbar, ~43.547 -71.294) ----
       // The Dive is a floating barge restaurant/bar that anchors at Smalls Cove
-      // Sandbar, on the south-west side of the lake near Alton Bay. NOT in OSM,
-      // NOT on the 1995-1996 cruising chart, NOT in NHDES. v2 coords were ~5 nm
-      // too far north (placed it near West Alton Marina); v3 coords from the
-      // Tyler-supplied "100 Notable Places" doc place Smalls Cove Sandbar on the
-      // SW shore between Alton Bay and Chestnut Cove (item #47 in that list).
-      // Anchor position still shifts with the barge — verify visually before
-      // transit. Source = The Dive's own site + Facebook + Tyler reference.
-      { cat: 'restaurant', lat: 43.4700, lng: -71.2600,
+      // Sandbar. NOT in OSM, NOT on the 1995-1996 cruising chart, NOT in NHDES —
+      // coords are a best-estimate derived from the West Alton shoreline
+      // (anchor position shifts with the barge, so verify visually before
+      // transit). Source = The Dive's own site + Facebook + Tyler reference.
+      // Coord history:
+      //   v1 (bc5d6dc, 2026-07-10): (43.5470, -71.2930) — original West Alton shoreline estimate
+      //   v3 (bc00350, 2026-07-10): (43.4700, -71.2600) — "fix" that landed ~5 nm too far north
+      //   v4 (2026-07-12):         (43.5468072668589, -71.29351077648408) — Tyler confirmed original area was correct
+      { cat: 'restaurant', lat: 43.5468072668589, lng: -71.29351077648408,
         name: 'The Dive',
         note: 'Floating bar & restaurant at Smalls Cove Sandbar, West Alton (SW shore, between Alton Bay and Chestnut Cove). Seasonal (typically May–Oct) — check @thedivenh on Facebook for daily weather updates. Boat-up only — coordinates approximate, anchor moves with the barge.',
-        source: 'thedivenh.com: "the coolest floating bar & restaurant on Lake Winnipesaukee… at local hot spots and sand bars on the lake"; Facebook page (1654415054595652): "anchored at the Smalls Cove Sandbar"; Tyler reference list 2026-07-10 item #47 ("West Alton Sandbar (Smalls Cove) — approx. 43.4700, -71.2600")' },
+        source: 'thedivenh.com: "the coolest floating bar & restaurant on Lake Winnipesaukee… at local hot spots and sand bars on the lake"; Facebook page (1654415054595652): "anchored at the Smalls Cove Sandbar"; Tyler reference list 2026-07-12 item #47 (43.5468072668589, -71.29351077648408)' },
 
       // ---- Moultonborough (Long Island bridge area, 43.662645, -71.349061) ----
       { cat: 'hotel', lat: 43.662645, lng: -71.349061,
