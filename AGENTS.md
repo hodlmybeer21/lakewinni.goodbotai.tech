@@ -40,7 +40,7 @@ winni-map/
 2. **Public boat launches** — 18+ NH launches with fees/notes, hardcoded `LAUNCHES` array in index.html.
 3. **Islands** — hardcoded `ISLANDS` polygon array, gray fill.
 4. **Crowdsourced buoys** — `localStorage.winniBuoys`. 4 types: red, green, white, yellow.
-5. **Crowdsourced hazards** — `localStorage.winniHazards`. 5 types: rock, submerged, shallow, current, other. Red triangle markers.
+5. **Crowdsourced hazards** — `localStorage.winniHazards`. 5 types: rock, submerged, shallow, current, other. Red triangle markers. As of 2026-07-12 there's also a one-shot curated seed (`HAZARD_SEED_VERSION = '1'`, flag `winniHazardsSeeded`) that ships a single rock entry at The Witches coords (43.6030, -71.4012); entries added there follow the same crowdsourced CRUD pattern as user-added ones (delete link in popup, dedup by id).
 6. **Crowdsourced depth soundings** — `localStorage.winniDepths`. **DORMANT in current prod** (modal button + layer checkbox removed in commit `4b9a260` but the helpers + storage are still in the code, ready to re-enable). See "Toggling depths on/off" below.
 7. **NH GRANIT bathymetry** — `layers.bathyLines` + `layers.bathyBands`. Off by default. Loads from `nhgeodata.unh.edu` and `granit24a.sr.unh.edu` (CORS-friendly for the deployed origin). Cached in localStorage with 30-day TTL. Yellow disclaimer banner shown while layer is on; every popup repeats "NOT for navigation — verify on an authoritative cruising chart."
 8. **Trip logging** — `localStorage.winniTrips`. Every GPS run auto-records a teal dotted trail behind the boat, throttled to ~3s or 5m of movement. On Stop GPS, prompts to name the trip. Past trips exportable as GPX.
@@ -53,7 +53,13 @@ winni-map/
 
    Future expansion: add published page references to upgrade bridged-island entries from `null` clearance to verified numbers, and replace approximate coords with verified locations when available. Never ship an entry with an empty `source` field.
 10. **🆘 Where-am-I rescue helper** — `showRescueModal()`. Tapping the new 🆘 action-bar button opens a modal with the current lat/lng (copyable), nearest public launch via haversine on the `LAUNCHES[]` array, nearest marina via haversine on the `MARINAS[]` array, a pre-formatted SMS-ready message, and one-tap `tel:` links to 911 and NH Marine Patrol (603-293-2037). Falls back to lake center if GPS not acquired, falls back to select-and-copy if the Clipboard API is blocked.
-11. **POIs (restaurants / hotels / groceries)** — `layers.pois` + `POI_TYPES` (restaurant / hotel / grocery) + crowdsourced `localStorage.winniPoisV1`. Follows the buoys/hazards CRUD pattern. Seeded on first load from a 2014 restaurants + 2016 hotels reference directory using the nearest `LAUNCHES[]` coords for each entry; seed is one-shot (flag `winniPoisV1Seeded`). User-added POIs carry their own `source` field for verification. v1 seed was 27 entries; v2 added The Dive at Smalls Cove Sandbar (West Alton) with bad coords (~5 nm north of true location); v3 fixed The Dive coords to (43.4700, -71.2600) per Tyler reference list 2026-07-10 item #47. Approximate coords are still approximate — see rule #13 for the protocol on replacing them. Tap 📍 → 🍽 POI to add a new one anywhere on the lake.
+11. **POIs (restaurants / hotels / groceries / historic sites)** — `layers.pois` + `POI_TYPES` (restaurant / hotel / grocery / historical) + crowdsourced `localStorage.winniPoisV1`. Follows the buoys/hazards CRUD pattern. Seeded on first load from a 2014 restaurants + 2016 hotels reference directory plus a 2026-07-12 Historic Landmarks list, using the nearest `LAUNCHES[]` coords for each reference entry; seed is one-shot (flag `winniPoisV1Seeded`). User-added POIs carry their own `source` field for verification.
+
+    As of v5 (2026-07-12) the POI layer is **split into 4 per-category sub-toggles** in the Layers panel: Restaurants / Hotels / Groceries / Historic. The single "POIs" master toggle still exists for visual sync — when any sub is on, the master displays as checked. Per-category sub-groups (`layers.poisRestaurants` / `poisHotels` / `poisGroceries` / `poisHistorical`) carry the actual markers, so toggling a sub is instant. The `cat` field on each `storedPoi` is the join key.
+
+    Historic Landmarks seed is curated-only (Tyler reference list 2026-07-12); entries are NOT for navigation. Their note typically is the historical/curiosity context, with a `source` citation that mentions a published primary ref (NH Division of Parks, Lake Winnipesaukee Historical Society, NRHP, etc.) for verification.
+
+    v1 seed was 27 entries; v2 added The Dive at Smalls Cove Sandbar (West Alton) with bad coords (~5 nm north of true location); v3 fixed The Dive coords to (43.4700, -71.2600) per Tyler reference list 2026-07-10 item #47; v4 reverted to West Alton shoreline area (43.5468, -71.2935) after Tyler supplied Google Maps reference 2026-07-12; v5 added the 10-entry Historic Landmarks category. Approximate coords are still approximate — see rule #13 for the protocol on replacing them. Tap 📍 → 🍽 POI to add a new one anywhere on the lake.
 
 ## Workflow for adding a new layer (the pattern)
 
@@ -155,6 +161,7 @@ cd /root/.openclaw/workspace/projects/winni-map && git status --short && git log
 
 ## Recent commit history (for context)
 
+- `winni-historic-landmark-category-v1` — Add POI category `historical` (4th POI_TYPES entry, bronze icon) + 10 curated Historic Landmarks (Tyler reference list 2026-07-12, NRHP/LWHS/NEHS citations). Split POI Layers toggle into 4 per-category sub-toggles (Restaurants / Hotels / Groceries / Historic). Add one-shot curated hazard seed (HAZARD_SEED_VERSION) shipping The Witches rock marker. POI_SEED_VERSION 4 → 5.
 - `winni-shipped-routes-v1` — Add shipped recommended routes (data/winni-routes.json + separate localStorage key + orange solid render + GPX export + "Route to start" via Google Maps). Route 01: Moultonborough Bay → Wolfeboro Bay via The Broads (69 waypoints, captain-drawn).
 
 - `d925c6b` — Add Pier 19 (Tuftonboro) to marinas & fuel-dock layer (225 GJW Hwy, gas + groceries)

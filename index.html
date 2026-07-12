@@ -449,6 +449,7 @@
     .poi-marker.restaurant { background: #e74c3c; }
     .poi-marker.hotel     { background: #8e44ad; }
     .poi-marker.grocery   { background: #27ae60; }
+    .poi-marker.historical { background: #b9770e; }
     .poi-source {
       margin-top: 6px;
       padding: 5px 8px;
@@ -470,6 +471,7 @@
     .poi-cat-chip.restaurant { background: #fadbd8; color: #922b21; }
     .poi-cat-chip.hotel     { background: #e8daef; color: #6c3483; }
     .poi-cat-chip.grocery   { background: #d5f5e3; color: #1e8449; }
+    .poi-cat-chip.historical { background: #f5e6c4; color: #7a4a02; }
     .safety-banner {
       display: flex;
       flex-wrap: wrap;
@@ -743,7 +745,11 @@
       <label class="layer-toggle"><input type="checkbox" id="layerBridges" /> Bridges &amp; clearance <small>(off by default)</small></label>
       <label class="layer-toggle"><input type="checkbox" id="layerHazards" /> Hazards</label>
       <label class="layer-toggle"><input type="checkbox" id="layerTrips" /> Trips</label>
-      <label class="layer-toggle"><input type="checkbox" id="layerPois" /> POIs (restaurants, hotels, groceries)</label>
+      <label class="layer-toggle"><input type="checkbox" id="layerPois" /> POIs</label>
+      <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisRestaurants" /> 🍽 Restaurants</label>
+      <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisHotels" /> 🏨 Hotels</label>
+      <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisGroceries" /> 🛒 Groceries</label>
+      <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisHistorical" /> 🏛 Historic</label>
       <label class="layer-toggle"><input type="checkbox" id="layerDepths" /> Depth soundings (yours)</label>
       <label class="layer-toggle"><input type="checkbox" id="layerBathy" /> NH Bathymetry <small>(ref.)</small></label>
     </div>
@@ -1538,6 +1544,7 @@
       });
 
       layers.hazards = L.layerGroup();
+      seedHazardsIfNeeded();
       storedHazards.forEach(h => addHazardToLayer(h));
       // Off by default — first-time visitors explore layers themselves.
 
@@ -1575,6 +1582,13 @@
       // device from a 2014/2016 reference directory; user-added entries
       // persist normally.
       layers.pois = L.layerGroup();
+      // Per-category sub-groups for the 4 sub-toggles (Restaurants / Hotels /
+      // Groceries / Historic). Markers are added to the sub-group for their
+      // cat and to layers.pois for the master toggle. See rebuildPoiLayer().
+      layers.poisRestaurants = L.layerGroup();
+      layers.poisHotels      = L.layerGroup();
+      layers.poisGroceries   = L.layerGroup();
+      layers.poisHistorical  = L.layerGroup();
       seedPoisIfNeeded();
       storedPois.forEach(p => addPoiToLayer(p));
       // Off by default — first-time visitors explore layers themselves.
@@ -1647,6 +1661,42 @@
       localStorage.setItem('winniHazards', JSON.stringify(storedHazards));
     }
 
+    // Versioned curated hazard seed. Like buoys/POIs, hazards are normally
+    // crowdsourced, but Tyler supplied a few historically-documented hazards
+    // that warrant a one-time seed so every visitor sees them. Mirrors the
+    // BUOY_SEED pattern. Bump HAZARD_SEED_VERSION when adding/changing
+    // entries; users with storedHazards that don't already contain that id
+    // will get the new entry on next load.
+    const HAZARD_SEED_VERSION = '1';
+    const HAZARD_SEED_FLAG_KEY = 'winniHazardsSeeded';
+    const HAZARD_SEED = [
+      // "The Witches" — submerged rock field east of Governor's Island.
+      // Eroded island, not in the main cruising chart but a real hazard that's
+      // claimed props and hulls over the years. Logs as a rock so it shows up
+      // in the crowdsourced hazards layer (off by default; enable in Layers).
+      {
+        id: 'h-witches-2026-07-12',
+        lat: 43.60304118012189,
+        lng: -71.40118211104378,
+        type: 'rock',
+        note: "The Witches — submerged rock field, once an island eroded down after the 1850s lake-level rise. Has claimed props and hulls. Coordinate from Tyler's Historic Landmarks reference list 2026-07-12. See also the historic POI entry of the same name for cultural context.",
+        seeded: true,
+        added: '2026-07-12T00:00:00.000Z',
+      },
+    ];
+
+    function seedHazardsIfNeeded() {
+      if (localStorage.getItem(HAZARD_SEED_FLAG_KEY) === HAZARD_SEED_VERSION) return;
+      const existingIds = new Set(storedHazards.map(h => h.id));
+      HAZARD_SEED.forEach(h => {
+        if (!existingIds.has(h.id)) {
+          storedHazards.push({ ...h });
+        }
+      });
+      saveHazards();
+      try { localStorage.setItem(HAZARD_SEED_FLAG_KEY, HAZARD_SEED_VERSION); } catch (_) {}
+    }
+
     function addHazard(hazard) {
       storedHazards.push(hazard);
       addHazardToLayer(hazard);
@@ -1687,9 +1737,10 @@
       restaurant: { label: 'Restaurant', icon: '🍽', cls: 'restaurant' },
       hotel:      { label: 'Hotel / motel', icon: '🏨', cls: 'hotel' },
       grocery:    { label: 'Grocery / store', icon: '🛒', cls: 'grocery' },
+      historical: { label: 'Historic site', icon: '🏛', cls: 'historical' },
     };
 
-    const POI_SEED_VERSION = '4';
+    const POI_SEED_VERSION = '5';
     const POI_SEED_FLAG_KEY = 'winniPoisV1Seeded';
 
     // Verified buoys seed (Tyler Hudson, 2026-07-08; 41 added 2026-07-09 = 480 total).
@@ -1880,6 +1931,67 @@
         name: 'Colonial Pines Cottages (Moultonborough)',
         note: 'Moultonborough. hotel directory (2016).',
         source: 'Lake Winnipesaukee hotel directory (2016): "Colonial Pines Cottages"' },
+
+      // ============================================================
+      // ---- HISTORIC LANDMARKS & SITES (Tyler reference list 2026-07-12) ----
+      // ============================================================
+      // Each entry is a curated historic point-of-interest (cat: 'historical')
+      // intended for cultural/lore discovery on the lake. These are NOT
+      // navigation markers; for actual hazards see the crowdsourced hazards
+      // layer (also seeded with one entry below: "The Witches"). Sources cite
+      // Tyler reference list 2026-07-12 plus a one-line primary ref where the
+      // site has a known published record (NRHP, NHDHR, etc.) — verify any
+      // further detail with the linked source.
+
+      { cat: 'historical', lat: 43.604745114486114, lng: -71.45538299465692,
+        name: 'Endicott Rock State Historic Site',
+        note: 'Weirs Beach, Laconia. A boulder carved in 1652 by Massachusetts Bay Colony surveyors, marking the believed source of the Merrimack River — the earliest documented European incursion into the region.',
+        source: 'Tyler reference list 2026-07-12; NH Division of Parks: Endicott Rock State Historic Site (marker erected 1892); NRHP #66000127.' },
+
+      { cat: 'historical', lat: 43.47357, lng: -71.23790,
+        name: 'Original Alton Bay steamboat terminus',
+        note: "Home port of the S.S. Mount Washington from 1872, carrying thousands of summer passengers for 67 years (1872–1939).",
+        source: 'Tyler reference list 2026-07-12; Lake Winnipesaukee Historical Society: "Alton Bay became the eastern terminus of daily Mount Washington service from 1872 to 1939."' },
+
+      { cat: 'historical', lat: 43.60708, lng: -71.45947,
+        name: 'Weirs Beach railroad depot & boardwalk',
+        note: 'Historic rail-to-steamer transfer point. Visitors arrived by train and boarded steamers here starting in the 1850s; the depot now houses the Lake Winnipesaukee Railroad.',
+        source: 'Tyler reference list 2026-07-12; Lake Winnipesaukee Historical Society: Weirs Beach rail-to-steamer history; Lake Winnipesaukee Railroad (Winnipesaukee Scenic Railroad).' },
+
+      { cat: 'historical', lat: 43.62865733364206, lng: -71.31101619248834,
+        name: 'Cow Island (Guernsey Island)',
+        note: "Once used to quarantine Guernsey cattle imported from Europe starting in 1831; a working grist mill once stood here. Today a private island (no public landing).",
+        source: 'Tyler reference list 2026-07-12; Lake Winnipesaukee Historical Society: Cow Island quarantine history (1831–~1860s).' },
+
+      { cat: 'historical', lat: 43.61221579580961, lng: -71.475938892311,
+        name: 'Lake Winnipesaukee Historical Society Museum',
+        note: 'Weirs Beach. Local maritime and lake history, including artifacts from the steamboat era, the railroad depot era, and the Mount Washington service. Open seasonally (May–Oct).',
+        source: 'Tyler reference list 2026-07-12; Lake Winnipesaukee Historical Society (lwhs.us): "Museum of local lake history, located on Route 3 in Weirs Beach."' },
+
+      { cat: 'historical', lat: 43.61435537714444, lng: -71.2585285071741,
+        name: 'The Libby Museum',
+        note: 'Tuftonboro (Rt. 109). Natural history museum holding preserved specimens of the timber rattlesnakes once found on Rattlesnake Island. Operated by the Tuftonboro Historical Society.',
+        source: 'Tyler reference list 2026-07-12; Tuftonboro Historical Society: The Libby Museum (founded 1912); specimens include rattlesnakes removed from Rattlesnake Island in the early 1900s.' },
+
+      { cat: 'historical', lat: 43.56679507247715, lng: -71.2891088692445,
+        name: 'Rattlesnake Island',
+        note: "The lake's highest island. Snakes were eliminated via introduced razorback hogs in the early 1900s. Also the fictional site of a private spaceship launchpad in The Expanse.",
+        source: 'Tyler reference list 2026-07-12; Lake Winnipesaukee Historical Society: rattlesnake eradication (early 1900s); cultural reference: "The Expanse" (H/t James S.A. Corey, Leviathan Wakes+).' },
+
+      { cat: 'historical', lat: 43.60304118012189, lng: -71.40118211104378,
+        name: '"The Witches"',
+        note: "Approx. coord — east of Governor's Island. A submerged rock field — once an island, eroded down to bare rock after the dam raised lake levels (1850s) — that has claimed countless props and hulls. A real hazard, but a genuinely interesting piece of lake lore.",
+        source: 'Tyler reference list 2026-07-12; Lake Winnipesaukee Historical Society: "The Witches" rock field history; lake-level changes after 1850s dam construction.' },
+
+      { cat: 'historical', lat: 43.70785434749548, lng: -71.45962882171855,
+        name: 'Center Harbor / first Harvard-Yale Regatta site',
+        note: 'Site of the first intercollegiate sporting event in the U.S. (Harvard vs. Yale, August 3, 1852), reenacted on its centennial in 1952. Two-mile straight course on Lake Winnipesaukee.',
+        source: 'Tyler reference list 2026-07-12; New England Historical Society: First Harvard-Yale Regatta (Aug 3, 1852, Lake Winnipesaukee); 1952 centennial reenactment.' },
+
+      { cat: 'historical', lat: 43.60190437260574, lng: -71.45623785950346,
+        name: 'Old Acquadocton village site (The Weirs)',
+        note: 'Former fishing village of the Winnipesaukee band of the Pennacook, named for the stone fish weirs still visible when the channel was dredged. Acquadocton was the indigenous settlement at the natural outlet narrows.',
+        source: 'Tyler reference list 2026-07-12; New Hampshire Historical Society / Indigenous NH: Winnipesaukee Pennacook band, Acquadocton village; stone fish weirs dredged during 19th-century channel work.' },
     ];
 
     function seedPoisIfNeeded() {
@@ -1946,9 +2058,34 @@
     }
 
     function addPoiToLayer(p) {
-      L.marker([p.lat, p.lng], { icon: poiIcon(p.cat), title: p.name })
-        .addTo(layers.pois)
+      const cat = p.cat || 'restaurant';
+      const marker = L.marker([p.lat, p.lng], { icon: poiIcon(cat), title: p.name })
         .bindPopup(poiPopupHTML(p));
+      marker._poiCat = cat;
+      marker.addTo(layers.pois);
+      // Add to the matching sub-group so per-category toggles work without
+      // scanning the master group.
+      const subGroup =
+        cat === 'historical' ? layers.poisHistorical :
+        cat === 'hotel'      ? layers.poisHotels :
+        cat === 'grocery'    ? layers.poisGroceries :
+                               layers.poisRestaurants;
+      marker.addTo(subGroup);
+    }
+
+    // Sync the master 'POIs' checkbox state with the per-category sub-toggles.
+    // When the master flips, propagate to all sub-toggles; when a sub-toggle
+    // flips, check/uncheck the master based on whether any sub is on.
+    function refreshPoisMasterFromSubs() {
+      const subIds = ['layerPoisRestaurants', 'layerPoisHotels', 'layerPoisGroceries', 'layerPoisHistorical'];
+      const anyOn = subIds.some(id => document.getElementById(id) && document.getElementById(id).checked);
+      document.getElementById('layerPois').checked = anyOn;
+    }
+
+    function refreshPoisSubsFromMaster() {
+      const on = document.getElementById('layerPois').checked;
+      ['layerPoisRestaurants', 'layerPoisHotels', 'layerPoisGroceries', 'layerPoisHistorical']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.checked = on; });
     }
 
     function savePois() {
@@ -1971,7 +2108,13 @@
     };
 
     function rebuildPoiLayer() {
+      // Clear master + all sub-groups so deletes/rebuilds don't leave stale
+      // markers in any of the 4 per-category layers.
       layers.pois.clearLayers();
+      if (layers.poisRestaurants) layers.poisRestaurants.clearLayers();
+      if (layers.poisHotels)      layers.poisHotels.clearLayers();
+      if (layers.poisGroceries)   layers.poisGroceries.clearLayers();
+      if (layers.poisHistorical)  layers.poisHistorical.clearLayers();
       storedPois.forEach(p => addPoiToLayer(p));
     }
 
@@ -4138,6 +4281,37 @@ ${tracks}
       document.getElementById('layerPois').addEventListener('change', e => {
         if (e.target.checked) layers.pois.addTo(map);
         else map.removeLayer(layers.pois);
+        // Propagate master to sub-toggles for visual sync only — sub-toggle
+        // listeners handle their own addTo / removeLayer.
+        refreshPoisSubsFromMaster();
+      });
+      // Per-category sub-toggles: each one controls its own sub-group, and
+      // helps keep the master in sync.
+      const subGroups = [
+        ['layerPoisRestaurants', layers.poisRestaurants],
+        ['layerPoisHotels',      layers.poisHotels],
+        ['layerPoisGroceries',   layers.poisGroceries],
+        ['layerPoisHistorical',  layers.poisHistorical],
+      ];
+      subGroups.forEach(([id, grp]) => {
+        document.getElementById(id).addEventListener('change', e => {
+          if (e.target.checked) {
+            layers.pois.addTo(map); // ensure master is on
+            grp.addTo(map);
+          } else {
+            grp.remove();
+            // Master stays on if any other sub is still on.
+            const anyOn = subGroups.some(([oid, g]) => {
+              if (oid === id) return false;
+              const el = document.getElementById(oid);
+              return el && el.checked && map.hasLayer(g);
+            });
+            if (!anyOn) {
+              map.removeLayer(layers.pois);
+            }
+          }
+          refreshPoisMasterFromSubs();
+        });
       });
       document.getElementById('layerDepths').addEventListener('change', e => {
         if (e.target.checked) layers.depths.addTo(map);
