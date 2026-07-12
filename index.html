@@ -3674,7 +3674,11 @@ ${trkpts}
     }
 
     function appendTripPoint(lat, lng, speedKn, headingDeg) {
-      if (!currentTrip) return;
+      if (!currentTrip) {
+        // BUG GUARD: should never happen — log it so we can diagnose.
+        console.warn('[winni-trip] appendTripPoint called but currentTrip is null. lat=', lat, 'lng=', lng);
+        return;
+      }
       const t = new Date().toISOString();
       const last = currentTrip.points[currentTrip.points.length - 1];
       // Throttle only once we have 2+ points — first two are always kept so
@@ -3684,10 +3688,15 @@ ${trkpts}
         const moved = haversine(last.lat, last.lng, lat, lng);
         if (dt < TRIP_MIN_INTERVAL_MS && moved < TRIP_MIN_MOVE_M) return;
       }
-      currentTrip.points.push({ t, lat, lng, speedKn, headingDeg });
-      currentTripLine.addLatLng([lat, lng]);
-      // Update the recording chip in the HUD
-      updateRecChip();
+      try {
+        currentTrip.points.push({ t, lat, lng, speedKn, headingDeg });
+        if (currentTripLine) currentTripLine.addLatLng([lat, lng]);
+        // Update the recording chip in the HUD
+        updateRecChip();
+      } catch (err) {
+        // Don't let a draw error kill the trip recording
+        console.error('[winni-trip] appendTripPoint error:', err, 'trip has', currentTrip.points.length, 'points');
+      }
     }
 
     function finishTrip() {
@@ -3707,15 +3716,21 @@ ${trkpts}
         currentTripEndMarker = null;
       }
       updateRecChip();
-      if (trip.points.length >= 2) {
+      // Always save the trip, even with 0/1 points. We tag short trips so
+      // the UI can warn about them but we never silently lose the data.
+      // If 0 points, mark it so we can offer a discard instead of confusing
+      // the user with a single-dot "trip" that isn't a real route.
+      if (trip.points.length >= 1) {
         storedTrips.push(trip);
         saveTrips();
         addTripToLayer(trip);
         // Ensure the trips layer is on so the user sees it
         document.getElementById('layerTrips').checked = true;
         layers.trips.addTo(map);
+        console.log('[winni-trip] finishTrip saved', trip.points.length, 'points,', tripDistanceKm(trip).toFixed(3), 'km');
         return { ok: true, trip };
       }
+      console.log('[winni-trip] finishTrip: 0 points recorded, discarding silently');
       return { ok: false, reason: 'too-few-points', trip };
     }
 
@@ -3946,11 +3961,13 @@ ${tracks}
     function startTracking() {
       if (!('geolocation' in navigator)) {
         setGpsStatus('GPS unsupported', 'err');
+        console.error('[winni-trip] geolocation not supported in this browser');
         return;
       }
       setGpsStatus('Acquiring GPS…', 'acquiring');
       // Start a fresh trip recording for this session
       startNewTrip();
+      console.log('[winni-trip] startTracking: trip started, currentTrip.id=', currentTrip && currentTrip.id);
       watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
         enableHighAccuracy: true,
         maximumAge: 1000,
@@ -3985,16 +4002,19 @@ ${tracks}
       document.getElementById('heading').textContent = '—';
       window.removeEventListener('deviceorientation', onOrient);
 
-      // Finish the trip. finishTrip() always returns a result object now:
-      //   { ok: true, trip }        — saved, prompt to name (unless auto-save)
-      //   { ok: false, reason }     — discarded, show toast explaining why
+      // Finish the trip. finishTrip() always returns a result object:
+      //   { ok: true, trip }             — saved (>=1 point), prompt to name
+      //   { ok: false, reason: 'no-current' }        — nothing was being recorded
+      //   { ok: false, reason: 'too-few-points' }    — 0 points recorded (silent discard)
       const result = finishTrip();
       if (!result.ok) {
         if (result.reason === 'too-few-points') {
-          showToast('Trip too short to save — keep GPS on while moving.');
-        } else if (result.reason === 'no-current') {
-          // No active trip; nothing to do
+          showToast('No GPS points recorded — check location permission, then try again.', {
+            label: 'How to fix',
+            onClick: () => window.open('https://support.google.com/chrome/answer/142065', '_blank'),
+          });
         }
+        // 'no-current' is silent — user pressed Stop without Start
         return;
       }
       // Trip saved. If user opted into auto-save, skip the prompt entirely.
@@ -4015,7 +4035,15 @@ ${tracks}
       const dist = tripDistanceKm(trip);
       const dur = tripDurationMin(trip);
       const maxSp = tripMaxSpeedKn(trip);
+      const isShort = trip.points.length < 2;
       body.innerHTML = `
+        ${isShort ? `
+          <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;color:#856404;">
+            <strong>⚠ Only ${trip.points.length} GPS point recorded.</strong><br>
+            Check that location permission is granted and GPS was active during the trip.
+            ${trip.points.length === 1 ? 'This trip is just a single dot — you may want to discard it.' : ''}
+          </div>
+        ` : ''}
         <p style="margin: 0 0 8px;">
           <strong>${trip.points.length}</strong> points &middot;
           <strong>${dist.toFixed(2)}</strong> km &middot;
@@ -4070,6 +4098,7 @@ ${tracks}
     };
 
     function onPos(pos) {
+      try {
       const c = pos.coords;
       const latlng = [c.latitude, c.longitude];
       const now = Date.now();
@@ -4137,6 +4166,9 @@ ${tracks}
 
       // Record this point in the current trip (throttled inside)
       appendTripPoint(c.latitude, c.longitude, speedKn, headingDeg);
+      } catch (err) {
+        console.error('[winni-trip] onPos error:', err);
+      }
     }
 
     let lastHeading = null;
