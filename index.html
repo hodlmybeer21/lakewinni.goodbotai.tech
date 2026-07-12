@@ -3676,46 +3676,9 @@ ${trkpts}
       return `Trip — ${day} · ${time}`;
     }
 
-    function appendTripPoint(lat, lng, speedKn, headingDeg) {
-      try {
-      if (!currentTrip) {
-        // BUG GUARD: should never happen — log it so we can diagnose.
-        console.warn('[winni-trip] appendTripPoint called but currentTrip is null. lat=', lat, 'lng=', lng);
-        return;
-      }
-      const t = new Date().toISOString();
-      const last = currentTrip.points[currentTrip.points.length - 1];
-      // Throttle: skip only if the previous fix was <3s ago AND we barely moved.
-      // Either enough time elapsed OR enough distance moved forces a record.
-      if (last) {
-        const dt = new Date(t) - new Date(last.t);
-        const moved = haversine(last.lat, last.lng, lat, lng);
-        if (dt < TRIP_MIN_INTERVAL_MS && moved < TRIP_MIN_MOVE_M) {
-          // Log every 100th skip so we can verify the throttle is working
-          if (typeof window._tripSkipCount === 'undefined') window._tripSkipCount = 0;
-          window._tripSkipCount++;
-          if (window._tripSkipCount === 1 || window._tripSkipCount % 100 === 0) {
-            console.log('[winni-trip] skipped #' + window._tripSkipCount, 'dt=', dt + 'ms', 'moved=', moved.toFixed(1) + 'm');
-          }
-          return;
-        }
-      }
-      currentTrip.points.push({ t, lat, lng, speedKn, headingDeg });
-      if (currentTripLine) currentTripLine.addLatLng([lat, lng]);
-      // Update the recording chip in the HUD
-      updateRecChip();
-      // Surface the point count in the document title and as a body
-      // attribute so it's visible even without opening DevTools.
-      document.title = `REC ${currentTrip.points.length} pts — Winni Nav`;
-      document.body.setAttribute('data-trip-count', currentTrip.points.length);
-      // Log the first 3 points so we know recording actually started
-      if (currentTrip.points.length <= 3 || currentTrip.points.length % 10 === 0) {
-        console.log('[winni-trip] recorded point #' + currentTrip.points.length, 'at', lat.toFixed(5), lng.toFixed(5), 'speed=', speedKn.toFixed(1) + 'kn');
-      }
-      } catch (err) {
-        console.error('[winni-trip] appendTripPoint THREW:', err && err.message, err && err.stack);
-      }
-    }
+    // Note: trip recording is now inlined into onPos() to eliminate any
+    // function-call indirection that could silently fail. See onPos body.
+    function _appendTripPointLegacyStub() { /* no-op, kept for reference */ }
 
     function finishTrip() {
       if (!currentTrip) return { ok: false, reason: 'no-current' };
@@ -4239,7 +4202,7 @@ ${tracks}
       if (typeof window._onPosCount === 'undefined') window._onPosCount = 0;
       window._onPosCount++;
       if (window._onPosCount === 1 || window._onPosCount % 50 === 0) {
-        console.log('[winni-trip] onPos #' + window._onPosCount, 'currentTrip?', !!currentTrip, 'lat=', c.latitude.toFixed(5), 'lng=', c.longitude.toFixed(5));
+        console.log('[winni-trip] onPos #' + window._onPosCount, 'currentTrip?', !!currentTrip, 'currentTrip.points?', currentTrip && currentTrip.points && currentTrip.points.length, 'lat=', c.latitude.toFixed(5), 'lng=', c.longitude.toFixed(5));
       }
 
       setGpsStatus(`${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`, 'on');
@@ -4303,9 +4266,33 @@ ${tracks}
       lastPos = { lat: c.latitude, lng: c.longitude };
       lastTime = now;
 
-      // Record this point in the current trip (throttled inside)
-      appendTripPoint(c.latitude, c.longitude, speedKn, headingDeg);
-      _lastFixTime = Date.now();
+      // Record this point in the current trip. INLINED for reliability:
+      // if appendTripPoint() fails for any reason, we don't want to lose data.
+      // Throttle: record at most one waypoint per 3 seconds OR when we've
+      // moved at least 5 meters from the last waypoint (whichever comes first).
+      if (currentTrip && currentTrip.points) {
+        const tIso = new Date(now).toISOString();
+        const pts = currentTrip.points;
+        const lastPt = pts.length > 0 ? pts[pts.length - 1] : null;
+        let shouldRecord = true;
+        if (lastPt) {
+          const dtMs = now - new Date(lastPt.t).getTime();
+          const movedM = haversine(lastPt.lat, lastPt.lng, c.latitude, c.longitude);
+          // Skip only if BOTH conditions are met (too soon AND barely moved)
+          if (dtMs < 3000 && movedM < 5) shouldRecord = false;
+        }
+        if (shouldRecord) {
+          pts.push({ t: tIso, lat: c.latitude, lng: c.longitude, speedKn, headingDeg });
+          try { if (currentTripLine) currentTripLine.addLatLng([c.latitude, c.longitude]); } catch (_) {}
+          updateRecChip();
+          document.title = `REC ${pts.length} pts — Winni Nav`;
+          document.body.setAttribute('data-trip-count', pts.length);
+          if (pts.length <= 3 || pts.length % 10 === 0) {
+            console.log('[winni-trip] recorded point #' + pts.length, 'at', c.latitude.toFixed(5), c.longitude.toFixed(5), 'speed=', speedKn.toFixed(1) + 'kn');
+          }
+        }
+      }
+      _lastFixTime = now;
       } catch (err) {
         console.error('[winni-trip] onPos error:', err);
       }
