@@ -3690,7 +3690,15 @@ ${trkpts}
       if (last) {
         const dt = new Date(t) - new Date(last.t);
         const moved = haversine(last.lat, last.lng, lat, lng);
-        if (dt < TRIP_MIN_INTERVAL_MS && moved < TRIP_MIN_MOVE_M) return;
+        if (dt < TRIP_MIN_INTERVAL_MS && moved < TRIP_MIN_MOVE_M) {
+          // Log every 100th skip so we can verify the throttle is working
+          if (typeof window._tripSkipCount === 'undefined') window._tripSkipCount = 0;
+          window._tripSkipCount++;
+          if (window._tripSkipCount === 1 || window._tripSkipCount % 100 === 0) {
+            console.log('[winni-trip] skipped #' + window._tripSkipCount, 'dt=', dt + 'ms', 'moved=', moved.toFixed(1) + 'm');
+          }
+          return;
+        }
       }
       currentTrip.points.push({ t, lat, lng, speedKn, headingDeg });
       if (currentTripLine) currentTripLine.addLatLng([lat, lng]);
@@ -3700,10 +3708,9 @@ ${trkpts}
       // attribute so it's visible even without opening DevTools.
       document.title = `REC ${currentTrip.points.length} pts — Winni Nav`;
       document.body.setAttribute('data-trip-count', currentTrip.points.length);
-      // Diagnostic: log every 10th point so console isn't flooded,
-      // plus the first one so we know recording actually started.
-      if (currentTrip.points.length === 1 || currentTrip.points.length % 10 === 0) {
-        console.log('[winni-trip] recorded point #' + currentTrip.points.length, 'at', lat.toFixed(5), lng.toFixed(5));
+      // Log the first 3 points so we know recording actually started
+      if (currentTrip.points.length <= 3 || currentTrip.points.length % 10 === 0) {
+        console.log('[winni-trip] recorded point #' + currentTrip.points.length, 'at', lat.toFixed(5), lng.toFixed(5), 'speed=', speedKn.toFixed(1) + 'kn');
       }
       } catch (err) {
         console.error('[winni-trip] appendTripPoint THREW:', err && err.message, err && err.stack);
