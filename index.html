@@ -3677,6 +3677,7 @@ ${trkpts}
     }
 
     function appendTripPoint(lat, lng, speedKn, headingDeg) {
+      try {
       if (!currentTrip) {
         // BUG GUARD: should never happen — log it so we can diagnose.
         console.warn('[winni-trip] appendTripPoint called but currentTrip is null. lat=', lat, 'lng=', lng);
@@ -3684,34 +3685,28 @@ ${trkpts}
       }
       const t = new Date().toISOString();
       const last = currentTrip.points[currentTrip.points.length - 1];
-      // Throttle: min 1 second AND min 2 meters of movement from the last point.
-      // Both conditions must be met to skip (i.e., EITHER 1s elapsed OR moved
-      // 2m+) to record. This produces ~1pt/sec at typical driving speeds
-      // without spamming the storage. The very first point is always kept.
-      if (last && currentTrip.points.length >= 1) {
+      // Throttle: skip only if the previous fix was <3s ago AND we barely moved.
+      // Either enough time elapsed OR enough distance moved forces a record.
+      if (last) {
         const dt = new Date(t) - new Date(last.t);
         const moved = haversine(last.lat, last.lng, lat, lng);
-        // Skip only if BOTH the time and distance thresholds are NOT met
-        // (i.e., we got a fix too soon AND we barely moved).
         if (dt < TRIP_MIN_INTERVAL_MS && moved < TRIP_MIN_MOVE_M) return;
       }
-      try {
-        currentTrip.points.push({ t, lat, lng, speedKn, headingDeg });
-        if (currentTripLine) currentTripLine.addLatLng([lat, lng]);
-        // Update the recording chip in the HUD
-        updateRecChip();
-        // Surface the point count in the document title and as a body
-        // attribute so it's visible even without opening DevTools.
-        document.title = `REC ${currentTrip.points.length} pts — Winni Nav`;
-        document.body.setAttribute('data-trip-count', currentTrip.points.length);
-        // Diagnostic: log every 10th point so console isn't flooded,
-        // plus the first one so we know recording actually started.
-        if (currentTrip.points.length === 1 || currentTrip.points.length % 10 === 0) {
-          console.log('[winni-trip] recorded point #' + currentTrip.points.length, 'at', lat.toFixed(5), lng.toFixed(5));
-        }
+      currentTrip.points.push({ t, lat, lng, speedKn, headingDeg });
+      if (currentTripLine) currentTripLine.addLatLng([lat, lng]);
+      // Update the recording chip in the HUD
+      updateRecChip();
+      // Surface the point count in the document title and as a body
+      // attribute so it's visible even without opening DevTools.
+      document.title = `REC ${currentTrip.points.length} pts — Winni Nav`;
+      document.body.setAttribute('data-trip-count', currentTrip.points.length);
+      // Diagnostic: log every 10th point so console isn't flooded,
+      // plus the first one so we know recording actually started.
+      if (currentTrip.points.length === 1 || currentTrip.points.length % 10 === 0) {
+        console.log('[winni-trip] recorded point #' + currentTrip.points.length, 'at', lat.toFixed(5), lng.toFixed(5));
+      }
       } catch (err) {
-        // Don't let a draw error kill the trip recording
-        console.error('[winni-trip] appendTripPoint error:', err, 'trip has', currentTrip.points.length, 'points');
+        console.error('[winni-trip] appendTripPoint THREW:', err && err.message, err && err.stack);
       }
     }
 
@@ -4232,6 +4227,13 @@ ${tracks}
       const c = pos.coords;
       const latlng = [c.latitude, c.longitude];
       const now = Date.now();
+
+      // Log every 50th onPos call so we know the handler is being invoked
+      if (typeof window._onPosCount === 'undefined') window._onPosCount = 0;
+      window._onPosCount++;
+      if (window._onPosCount === 1 || window._onPosCount % 50 === 0) {
+        console.log('[winni-trip] onPos #' + window._onPosCount, 'currentTrip?', !!currentTrip, 'lat=', c.latitude.toFixed(5), 'lng=', c.longitude.toFixed(5));
+      }
 
       setGpsStatus(`${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`, 'on');
 
