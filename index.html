@@ -349,6 +349,72 @@
       #routeBanner { top: 96px; font-size: 11px; padding: 6px 12px; }
       #routeActionBar { bottom: 96px; padding: 4px 8px; font-size: 12px; }
     }
+    /* Trip recording indicator (HUD chip) */
+    #hudRec {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+      padding: 4px 8px;
+      background: rgba(26, 188, 156, 0.15);
+      border: 1px solid #1abc9c;
+      border-radius: 12px;
+      font-size: 11px;
+      color: #0a3d62;
+      font-weight: 600;
+      line-height: 1;
+    }
+    #hudRec.on { display: inline-flex; }
+    #hudRecDot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #e74c3c;
+      animation: hudRecPulse 1.4s ease-in-out infinite;
+    }
+    @keyframes hudRecPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.45; transform: scale(0.75); }
+    }
+
+    /* Toast (bottom-center confirmation) */
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%) translateY(20px);
+      background: #0a3d62;
+      color: white;
+      padding: 12px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 2500;
+      max-width: 90vw;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+    #toast .toast-action {
+      background: #1abc9c;
+      color: white;
+      border: none;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #toast .toast-action:hover { background: #16a085; }
+
     /* Modal */
     #modal {
       position: fixed;
@@ -773,6 +839,10 @@
       <span id="hudGpsDot" class="hud-gps-dot"></span>
       <span id="hudGpsText">GPS off</span>
     </div>
+    <div id="hudRec" title="Recording trip">
+      <span id="hudRecDot"></span>
+      <span>REC · <span id="hudRecPoints">0</span> pts · <span id="hudRecDist">0.00</span> km</span>
+    </div>
   </div>
 
   <div id="actions" class="hud">
@@ -794,6 +864,8 @@
       <div class="row" id="modalActions"></div>
     </div>
   </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
 
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -3535,35 +3607,65 @@ ${trkpts}
     function startNewTrip(name) {
       currentTrip = {
         id: 't' + Date.now() + Math.random().toString(36).slice(2, 7),
-        name: name || ('Trip ' + new Date().toLocaleString()),
+        name: name || defaultTripName(),
         started: new Date().toISOString(),
         points: [],
       };
       currentTripLine = L.polyline([], {
         color: '#1abc9c', weight: 4, opacity: 0.9,
         dashArray: '6, 6', lineCap: 'round',
-      }).addTo(map);
+      }).addTo(layers.trips);
+      // Ensure the Trips layer is visible so the user sees the recording
+      layers.trips.addTo(map);
+      document.getElementById('layerTrips').checked = true;
+      // Live start marker (green dot) — added as points arrive
+      currentTripStartMarker = null;
+      currentTripEndMarker = null;
+      updateRecChip();
+    }
+
+    // Friendlier default name: "Trip — Sat Jul 12 · 5:37 PM"
+    function defaultTripName() {
+      const d = new Date();
+      const day = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+      const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+      return `Trip — ${day} · ${time}`;
     }
 
     function appendTripPoint(lat, lng, speedKn, headingDeg) {
       if (!currentTrip) return;
       const t = new Date().toISOString();
       const last = currentTrip.points[currentTrip.points.length - 1];
-      // Throttle: skip if too soon or haven't moved enough
-      if (last) {
+      // Throttle only once we have 2+ points — first two are always kept so
+      // a quick Start/Stop never silently produces a single-point trip.
+      if (last && currentTrip.points.length >= 2) {
         const dt = new Date(t) - new Date(last.t);
         const moved = haversine(last.lat, last.lng, lat, lng);
         if (dt < TRIP_MIN_INTERVAL_MS && moved < TRIP_MIN_MOVE_M) return;
       }
       currentTrip.points.push({ t, lat, lng, speedKn, headingDeg });
       currentTripLine.addLatLng([lat, lng]);
+      // Update the recording chip in the HUD
+      updateRecChip();
     }
 
     function finishTrip() {
-      if (!currentTrip) return null;
+      if (!currentTrip) return { ok: false, reason: 'no-current' };
       const trip = currentTrip;
       currentTrip = null;
-      if (currentTripLine) { map.removeLayer(currentTripLine); currentTripLine = null; }
+      if (currentTripLine) {
+        try { layers.trips.removeLayer(currentTripLine); } catch (_) {}
+        currentTripLine = null;
+      }
+      if (currentTripStartMarker) {
+        try { layers.trips.removeLayer(currentTripStartMarker); } catch (_) {}
+        currentTripStartMarker = null;
+      }
+      if (currentTripEndMarker) {
+        try { layers.trips.removeLayer(currentTripEndMarker); } catch (_) {}
+        currentTripEndMarker = null;
+      }
+      updateRecChip();
       if (trip.points.length >= 2) {
         storedTrips.push(trip);
         saveTrips();
@@ -3571,9 +3673,54 @@ ${trkpts}
         // Ensure the trips layer is on so the user sees it
         document.getElementById('layerTrips').checked = true;
         layers.trips.addTo(map);
-        return trip;
+        return { ok: true, trip };
       }
-      return null;
+      return { ok: false, reason: 'too-few-points', trip };
+    }
+
+    // Update the "REC · N pts · X km" chip in the HUD
+    function updateRecChip() {
+      const chip = document.getElementById('hudRec');
+      if (!chip) return;
+      if (!currentTrip || !currentTrip.points || currentTrip.points.length === 0) {
+        chip.classList.remove('on');
+        return;
+      }
+      chip.classList.add('on');
+      document.getElementById('hudRecPoints').textContent = currentTrip.points.length;
+      document.getElementById('hudRecDist').textContent = tripDistanceKm(currentTrip).toFixed(2);
+    }
+
+    // Toast helper. msg: string. action: {label, onClick} | null.
+    let _toastTimer = null;
+    function showToast(msg, action) {
+      const el = document.getElementById('toast');
+      if (!el) return;
+      el.innerHTML = '';
+      const span = document.createElement('span');
+      span.textContent = msg;
+      el.appendChild(span);
+      if (action && action.label && typeof action.onClick === 'function') {
+        const btn = document.createElement('button');
+        btn.className = 'toast-action';
+        btn.textContent = action.label;
+        btn.addEventListener('click', () => {
+          hideToast();
+          try { action.onClick(); } catch (e) { console.warn('toast action err', e); }
+        });
+        el.appendChild(btn);
+      }
+      // Force reflow then show so the transition fires
+      void el.offsetHeight;
+      el.classList.add('show');
+      if (_toastTimer) clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(hideToast, action ? 8000 : 3500);
+    }
+    function hideToast() {
+      const el = document.getElementById('toast');
+      if (!el) return;
+      el.classList.remove('show');
+      if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
     }
 
     window.deleteTrip = function(id) {
@@ -3662,7 +3809,7 @@ ${tracks}
       }
       setGpsStatus('Acquiring GPS…', 'acquiring');
       // Start a fresh trip recording for this session
-      startNewTrip('Trip ' + new Date().toLocaleString());
+      startNewTrip();
       watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
         enableHighAccuracy: true,
         maximumAge: 1000,
@@ -3697,11 +3844,25 @@ ${tracks}
       document.getElementById('heading').textContent = '—';
       window.removeEventListener('deviceorientation', onOrient);
 
-      // Finish the trip: if it has enough points, prompt to name it
-      const finishedTrip = finishTrip();
-      if (finishedTrip) {
-        promptNameTrip(finishedTrip);
+      // Finish the trip. finishTrip() always returns a result object now:
+      //   { ok: true, trip }        — saved, prompt to name (unless auto-save)
+      //   { ok: false, reason }     — discarded, show toast explaining why
+      const result = finishTrip();
+      if (!result.ok) {
+        if (result.reason === 'too-few-points') {
+          showToast('Trip too short to save — keep GPS on while moving.');
+        } else if (result.reason === 'no-current') {
+          // No active trip; nothing to do
+        }
+        return;
       }
+      // Trip saved. If user opted into auto-save, skip the prompt entirely.
+      if (localStorage.getItem('winniTripsAutoSave') === '1') {
+        const name = result.trip.name;
+        showToast(`✓ Trip saved as “${name}”`, null);
+        return;
+      }
+      promptNameTrip(result.trip);
     }
 
     function promptNameTrip(trip) {
@@ -3725,10 +3886,14 @@ ${tracks}
         <p style="font-size:11px;color:#666;margin-top:8px;">
           Saved to your phone. Tap the trip line on the map later to export as GPX.
         </p>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;text-transform:none;letter-spacing:0;color:#444;font-weight:500;">
+          <input type="checkbox" id="tripAutoSaveChk" style="width:auto;margin:0;" />
+          Don't ask in the future — save with default name
+        </label>
       `;
       actions.innerHTML = `
-        <button class="btn btn-secondary" onclick="skipTripName()">Keep default</button>
-        <button class="btn btn-primary" onclick="saveTripName('${trip.id}')">Save</button>
+        <button class="btn btn-secondary" onclick="discardTrip('${trip.id}')">Discard trip</button>
+        <button class="btn btn-primary" onclick="saveTripName('${trip.id}')">Save & name</button>
       `;
       // Auto-select the input so user can just type
       setTimeout(() => {
@@ -3744,13 +3909,23 @@ ${tracks}
       const input = document.getElementById('tripNameInput');
       const newName = input ? input.value.trim() : '';
       if (newName) trip.name = newName;
+      const autoChk = document.getElementById('tripAutoSaveChk');
+      if (autoChk && autoChk.checked) {
+        try { localStorage.setItem('winniTripsAutoSave', '1'); } catch (e) {}
+      }
       saveTrips();
       rebuildTripLayer();
       document.getElementById('modal').classList.remove('show');
+      showToast(`✓ Trip saved as “${trip.name}”`, null);
     };
 
-    window.skipTripName = function() {
+    window.discardTrip = function(id) {
+      const idx = storedTrips.findIndex(t => t.id === id);
+      if (idx !== -1) storedTrips.splice(idx, 1);
+      saveTrips();
+      rebuildTripLayer();
       document.getElementById('modal').classList.remove('show');
+      showToast('Trip discarded.', null);
     };
 
     function onPos(pos) {
