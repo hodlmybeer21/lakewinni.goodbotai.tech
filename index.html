@@ -880,11 +880,13 @@
     </div>
     <div id="hudRec" title="Recording trip">
       <span id="hudRecDot"></span>
-      <span>REC · <span id="hudRecPoints">0</span> pts · <span id="hudRecDist">0.00</span> km</span>
+      <span id="hudRecLabel">REC · <span id="hudRecPoints">0</span> pts · <span id="hudRecDist">0.00</span> km</span>
+      <span id="hudRecFixAge" style="font-weight:400;color:#888;margin-left:4px;"></span>
     </div>
   </div>
 
   <div id="actions" class="hud">
+    <button class="icon-btn" id="testGpsBtn" title="Test GPS" onclick="testGps()">🛰️</button>
     <button class="icon-btn" id="vesselIconBtn" title="Change vessel icon" onclick="showVesselPickerModal()">🚤</button>
     <button class="icon-btn" id="recenterBtn" title="Recenter on me">⊙</button>
     <button class="icon-btn" id="buoyModeBtn" title="Add buoy mode">📍</button>
@@ -3738,14 +3740,28 @@ ${trkpts}
     function updateRecChip() {
       const chip = document.getElementById('hudRec');
       if (!chip) return;
-      if (!currentTrip || !currentTrip.points || currentTrip.points.length === 0) {
+      if (!currentTrip) {
         chip.classList.remove('on');
         return;
       }
+      // Always show the chip while a trip is active, even at 0 points —
+      // user needs to know a trip is being recorded.
       chip.classList.add('on');
       document.getElementById('hudRecPoints').textContent = currentTrip.points.length;
       document.getElementById('hudRecDist').textContent = tripDistanceKm(currentTrip).toFixed(2);
     }
+
+    // Track time since last GPS fix for the REC chip age indicator
+    let _lastFixTime = null;
+    function updateFixAge() {
+      const el = document.getElementById('hudRecFixAge');
+      if (!el) return;
+      if (!_lastFixTime || !currentTrip) { el.textContent = ''; return; }
+      const sec = Math.round((Date.now() - _lastFixTime) / 1000);
+      if (sec < 60) el.textContent = `(last fix ${sec}s ago)`;
+      else el.textContent = `(last fix ${Math.round(sec/60)}m ago)`;
+    }
+    setInterval(updateFixAge, 1000);
 
     // Toast helper. msg: string. action: {label, onClick} | null.
     let _toastTimer = null;
@@ -3958,6 +3974,65 @@ ${tracks}
       }
     }
 
+    // One-shot GPS test. Runs a single getCurrentPosition and reports the
+    // result in a modal so the user can verify their location is working
+    // without committing to a full trip recording session.
+    window.testGps = function() {
+      const modal = document.getElementById('modal');
+      const body = document.getElementById('modalBody');
+      const actions = document.getElementById('modalActions');
+      const title = document.getElementById('modalTitle');
+      title.textContent = '🛰️ GPS test';
+      if (!('geolocation' in navigator)) {
+        body.innerHTML = `<p style="color:#c0392b;">Geolocation is not supported in this browser.</p>`;
+        actions.innerHTML = `<button class="btn btn-primary" onclick="cancelModal()">Close</button>`;
+        modal.classList.add('show');
+        return;
+      }
+      body.innerHTML = `
+        <p>Requesting a single GPS fix…</p>
+        <p style="font-size:12px;color:#666;">This may take up to 30 seconds on first use, while your phone acquires satellites.</p>
+        <div id="testGpsResult" style="margin-top:12px;"></div>
+      `;
+      actions.innerHTML = `<button class="btn btn-secondary" onclick="cancelModal()">Close</button>`;
+      modal.classList.add('show');
+      const startedAt = Date.now();
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+          const c = pos.coords;
+          document.getElementById('testGpsResult').innerHTML = `
+            <div style="background:#d4edda;border:1px solid #28a745;border-radius:8px;padding:10px;color:#155724;">
+              <strong>✓ GPS is working!</strong><br>
+              Lat: <code>${c.latitude.toFixed(6)}</code><br>
+              Lng: <code>${c.longitude.toFixed(6)}</code><br>
+              Accuracy: ${c.accuracy ? Math.round(c.accuracy) + ' m' : 'unknown'}<br>
+              Fix took ${elapsed}s.
+            </div>
+            <p style="font-size:12px;color:#666;margin-top:10px;">If this works but trips still fail, the issue is something else (screen lock, tab backgrounding, etc.).</p>
+          `;
+          console.log('[winni-trip] testGps OK:', c.latitude, c.longitude, '±' + c.accuracy + 'm', 'in', elapsed + 's');
+        },
+        (err) => {
+          const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+          let hint = '';
+          if (err.code === 1) hint = 'You denied location permission. Enable it for this site in your browser settings, then try again.';
+          else if (err.code === 2) hint = 'Position is currently unavailable. Make sure Location Services is ON in your phone settings, and try moving outdoors or near a window.';
+          else if (err.code === 3) hint = 'GPS timed out. Poor satellite signal — try moving outdoors or near a window.';
+          document.getElementById('testGpsResult').innerHTML = `
+            <div style="background:#f8d7da;border:1px solid #dc3545;border-radius:8px;padding:10px;color:#721c24;">
+              <strong>✗ GPS error (code ${err.code})</strong><br>
+              ${err.message}<br>
+              <small>Fix attempt took ${elapsed}s before failing.</small>
+            </div>
+            <p style="font-size:13px;color:#444;margin-top:10px;">${hint}</p>
+          `;
+          console.error('[winni-trip] testGps failed:', err.code, err.message, 'after', elapsed + 's');
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
+      );
+    };
+
     function startTracking() {
       if (!('geolocation' in navigator)) {
         setGpsStatus('GPS unsupported', 'err');
@@ -4039,6 +4114,7 @@ ${tracks}
       document.getElementById('heading').textContent = '—';
       window.removeEventListener('deviceorientation', onOrient);
       releaseWakeLock();
+      _lastFixTime = null;
 
       // Finish the trip. finishTrip() always returns a result object:
       //   { ok: true, trip }             — saved (>=1 point), prompt to name
@@ -4204,6 +4280,7 @@ ${tracks}
 
       // Record this point in the current trip (throttled inside)
       appendTripPoint(c.latitude, c.longitude, speedKn, headingDeg);
+      _lastFixTime = Date.now();
       } catch (err) {
         console.error('[winni-trip] onPos error:', err);
       }
