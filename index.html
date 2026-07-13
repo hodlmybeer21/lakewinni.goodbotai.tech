@@ -224,7 +224,11 @@
       max-width: calc(100vw - 32px);
       overflow: hidden;
       transition: max-height 0.22s ease, padding 0.22s ease;
-      max-height: 60vh;
+      /* Use viewport-relative height so the panel always fits and the body
+         can scroll to the last item (NH Bathymetry) on any viewport. */
+      max-height: calc(100vh - 100px);
+      display: flex;
+      flex-direction: column;
     }
     /* Collapsed state: only the header chip is visible. */
     #layers.collapsed {
@@ -255,6 +259,7 @@
       cursor: pointer;
       user-select: none;
       border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex: 0 0 auto;
     }
     #layers-header .chevron {
       font-size: 12px;
@@ -267,8 +272,12 @@
     }
     #layers-body {
       padding: 6px 12px 10px 12px;
-      max-height: 60vh;
+      /* Flex child of #layers: claim remaining space and scroll internally
+         so all 14 items (incl. NH Bathymetry at the bottom) are reachable. */
+      flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .layer-toggle {
       display: flex;
@@ -2089,9 +2098,11 @@
       const marker = L.marker([p.lat, p.lng], { icon: poiIcon(cat), title: p.name })
         .bindPopup(poiPopupHTML(p));
       marker._poiCat = cat;
-      marker.addTo(layers.pois);
-      // Add to the matching sub-group so per-category toggles work without
-      // scanning the master group.
+      // POIs live ONLY in per-category sub-groups now. `layers.pois` (the
+      // master) is kept as an empty placeholder so older code paths that
+      // reference it stay null-safe; visibility is driven by the sub-toggles.
+      // (Adding to both would make `layers.pois` show ALL POIs whenever any
+      // sub is checked, breaking per-category filtering.)
       const subGroup =
         cat === 'historical' ? layers.poisHistorical :
         cat === 'hotel'      ? layers.poisHotels :
@@ -2872,9 +2883,20 @@
         seeded: false,
       };
       addPoi(poi);
-      // Make sure POI layer is on so user sees their addition
-      document.getElementById('layerPois').checked = true;
-      layers.pois.addTo(map);
+      // Make sure the matching sub-group is visible so the user sees their
+      // addition. Master checkbox is synced via refreshPoisMasterFromSubs.
+      const subId =
+        poi.cat === 'historical' ? 'layerPoisHistorical' :
+        poi.cat === 'hotel'      ? 'layerPoisHotels' :
+        poi.cat === 'grocery'    ? 'layerPoisGroceries' :
+                                   'layerPoisRestaurants';
+      const subEl = document.getElementById(subId);
+      if (subEl && !subEl.checked) {
+        subEl.checked = true;
+        subEl.dispatchEvent(new Event('change'));
+      } else {
+        refreshPoisMasterFromSubs();
+      }
       cancelModal();
       exitBuoyMode();
     };
@@ -4306,14 +4328,23 @@ ${tracks}
         else map.removeLayer(layers.trips);
       });
       document.getElementById('layerPois').addEventListener('change', e => {
-        if (e.target.checked) layers.pois.addTo(map);
-        else map.removeLayer(layers.pois);
-        // Propagate master to sub-toggles for visual sync only — sub-toggle
-        // listeners handle their own addTo / removeLayer.
+        // Master toggle: bulk on/off for all sub-categories. The sub-toggle
+        // listeners handle their own addTo/removeLayer — we just sync state
+        // and dispatch change events so the visual sync propagates.
+        const on = e.target.checked;
+        ['layerPoisRestaurants', 'layerPoisHotels', 'layerPoisGroceries', 'layerPoisHistorical']
+          .forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el.checked !== on) {
+              el.checked = on;
+              el.dispatchEvent(new Event('change'));
+            }
+          });
         refreshPoisSubsFromMaster();
       });
-      // Per-category sub-toggles: each one controls its own sub-group, and
-      // helps keep the master in sync.
+      // Per-category sub-toggles: each one ONLY controls its own sub-group.
+      // We no longer touch layers.pois (master) — keeping markers there would
+      // show every POI category whenever any sub was checked.
       const subGroups = [
         ['layerPoisRestaurants', layers.poisRestaurants],
         ['layerPoisHotels',      layers.poisHotels],
@@ -4323,19 +4354,9 @@ ${tracks}
       subGroups.forEach(([id, grp]) => {
         document.getElementById(id).addEventListener('change', e => {
           if (e.target.checked) {
-            layers.pois.addTo(map); // ensure master is on
             grp.addTo(map);
           } else {
             grp.remove();
-            // Master stays on if any other sub is still on.
-            const anyOn = subGroups.some(([oid, g]) => {
-              if (oid === id) return false;
-              const el = document.getElementById(oid);
-              return el && el.checked && map.hasLayer(g);
-            });
-            if (!anyOn) {
-              map.removeLayer(layers.pois);
-            }
           }
           refreshPoisMasterFromSubs();
         });
