@@ -860,6 +860,15 @@
     </div>
   </div>
 
+  <div id="winniTripDebug" style="position:fixed;top:0;left:0;right:0;background:#0a3d62;color:#fff;font:11px monospace;padding:6px 10px;z-index:3000;border-bottom:2px solid #1abc9c;display:none;">
+      <span id="wtdState">state: idle</span> &middot;
+      <span id="wtdPoints">pts: 0</span> &middot;
+      <span id="wtdLastFix">last fix: never</span> &middot;
+      <span id="wtdOnPos">onPos: 0</span> &middot;
+      <span id="wtdSkipped">skipped: 0</span> &middot;
+      <span id="wtdErrors" style="color:#ff6b6b;">err: none</span>
+    </div>
+
   <div id="hudData" class="hud">
     <div class="hud-main">
       <div id="compass"><div id="compass-arrow"></div></div>
@@ -3732,6 +3741,36 @@ ${trkpts}
 
     // Track time since last GPS fix for the REC chip age indicator
     let _lastFixTime = null;
+    let _onPosCount = 0;
+    let _skippedCount = 0;
+    let _lastError = 'none';
+
+    function setTripDebug(opts) {
+      const el = document.getElementById('winniTripDebug');
+      if (!el) return;
+      if (opts.state !== undefined) document.getElementById('wtdState').textContent = 'state: ' + opts.state;
+      if (opts.points !== undefined) document.getElementById('wtdPoints').textContent = 'pts: ' + opts.points;
+      if (opts.lastFix !== undefined) document.getElementById('wtdLastFix').textContent = 'last fix: ' + opts.lastFix;
+      if (opts.onPos !== undefined) document.getElementById('wtdOnPos').textContent = 'onPos: ' + opts.onPos;
+      if (opts.skipped !== undefined) document.getElementById('wtdSkipped').textContent = 'skipped: ' + opts.skipped;
+      if (opts.error !== undefined) {
+        _lastError = opts.error;
+        document.getElementById('wtdErrors').textContent = 'err: ' + opts.error;
+      }
+      el.style.display = opts.show ? 'block' : 'none';
+    }
+    function showTripDebug() { const el = document.getElementById('winniTripDebug'); if (el) el.style.display = 'block'; }
+    function hideTripDebug() { const el = document.getElementById('winniTripDebug'); if (el) el.style.display = 'none'; }
+    function tickFixAgeDebug() {
+      if (!currentTrip) return;
+      if (_lastFixTime) {
+        const s = Math.round((Date.now() - _lastFixTime) / 1000);
+        document.getElementById('wtdLastFix').textContent = 'last fix: ' + s + 's ago';
+      } else {
+        document.getElementById('wtdLastFix').textContent = 'last fix: waiting…';
+      }
+    }
+    setInterval(tickFixAgeDebug, 1000);
     function updateFixAge() {
       const el = document.getElementById('hudRecFixAge');
       if (!el) return;
@@ -4022,6 +4061,11 @@ ${tracks}
       setGpsStatus('Acquiring GPS…', 'acquiring');
       // Start a fresh trip recording for this session
       startNewTrip();
+      _onPosCount = 0;
+      _skippedCount = 0;
+      _lastError = 'none';
+      showTripDebug();
+      setTripDebug({ show: true, state: 'tracking', points: 0, lastFix: 'waiting…', onPos: 0, skipped: 0, error: 'none' });
       console.log('[winni-trip] startTracking: trip started, currentTrip.id=', currentTrip && currentTrip.id);
       // Proactively request a single fix first. On iOS Safari this triggers
       // the "Allow location for this website?" prompt if permission hasn't
@@ -4096,6 +4140,7 @@ ${tracks}
       _lastFixTime = null;
       document.title = 'Winni Nav';
       document.body.removeAttribute('data-trip-count');
+      hideTripDebug();
 
       // Finish the trip. finishTrip() always returns a result object:
       //   { ok: true, trip }             — saved (>=1 point), prompt to name
@@ -4199,10 +4244,10 @@ ${tracks}
       const now = Date.now();
 
       // Log every 50th onPos call so we know the handler is being invoked
-      if (typeof window._onPosCount === 'undefined') window._onPosCount = 0;
-      window._onPosCount++;
-      if (window._onPosCount === 1 || window._onPosCount % 50 === 0) {
-        console.log('[winni-trip] onPos #' + window._onPosCount, 'currentTrip?', !!currentTrip, 'currentTrip.points?', currentTrip && currentTrip.points && currentTrip.points.length, 'lat=', c.latitude.toFixed(5), 'lng=', c.longitude.toFixed(5));
+      _onPosCount++;
+      setTripDebug({ onPos: _onPosCount });
+      if (_onPosCount === 1 || _onPosCount % 50 === 0) {
+        console.log('[winni-trip] onPos #' + _onPosCount, 'currentTrip?', !!currentTrip, 'currentTrip.points?', currentTrip && currentTrip.points && currentTrip.points.length, 'lat=', c.latitude.toFixed(5), 'lng=', c.longitude.toFixed(5));
       }
 
       setGpsStatus(`${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`, 'on');
@@ -4275,11 +4320,12 @@ ${tracks}
         const pts = currentTrip.points;
         const lastPt = pts.length > 0 ? pts[pts.length - 1] : null;
         let shouldRecord = true;
+        let skipReason = '';
         if (lastPt) {
           const dtMs = now - new Date(lastPt.t).getTime();
           const movedM = haversine(lastPt.lat, lastPt.lng, c.latitude, c.longitude);
           // Skip only if BOTH conditions are met (too soon AND barely moved)
-          if (dtMs < 3000 && movedM < 5) shouldRecord = false;
+          if (dtMs < 3000 && movedM < 5) { shouldRecord = false; skipReason = `dt=${dtMs}ms moved=${movedM.toFixed(1)}m`; }
         }
         if (shouldRecord) {
           pts.push({ t: tIso, lat: c.latitude, lng: c.longitude, speedKn, headingDeg });
@@ -4287,14 +4333,21 @@ ${tracks}
           updateRecChip();
           document.title = `REC ${pts.length} pts — Winni Nav`;
           document.body.setAttribute('data-trip-count', pts.length);
+          setTripDebug({ points: pts.length, lastFix: 'just now', onPos: _onPosCount, skipped: _skippedCount });
           if (pts.length <= 3 || pts.length % 10 === 0) {
             console.log('[winni-trip] recorded point #' + pts.length, 'at', c.latitude.toFixed(5), c.longitude.toFixed(5), 'speed=', speedKn.toFixed(1) + 'kn');
           }
+        } else {
+          _skippedCount++;
+          setTripDebug({ onPos: _onPosCount, skipped: _skippedCount });
         }
+      } else {
+        setTripDebug({ error: 'currentTrip is null at recording time!' });
       }
       _lastFixTime = now;
       } catch (err) {
         console.error('[winni-trip] onPos error:', err);
+        setTripDebug({ error: (err && err.message) || String(err) });
       }
     }
 
