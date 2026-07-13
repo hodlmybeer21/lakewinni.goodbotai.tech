@@ -460,6 +460,7 @@
     .poi-marker.grocery   { background: #27ae60; }
     .poi-marker.historical { background: #b9770e; }
     .poi-marker.dive       { background: #0e6655; }
+    .poi-marker.sandbar    { background: #c19a6b; }
     .poi-source {
       margin-top: 6px;
       padding: 5px 8px;
@@ -483,6 +484,7 @@
     .poi-cat-chip.grocery   { background: #d5f5e3; color: #1e8449; }
     .poi-cat-chip.historical { background: #f5e6c4; color: #7a4a02; }
     .poi-cat-chip.dive       { background: #d1f2eb; color: #0b5345; }
+    .poi-cat-chip.sandbar    { background: #fdebd0; color: #6e4d1a; }
     .safety-banner {
       display: flex;
       flex-wrap: wrap;
@@ -762,6 +764,7 @@
       <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisGroceries" /> 🛒 Groceries</label>
       <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisHistorical" /> 🏛 Historic</label>
       <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisDive" /> 🤿 Dive sites</label>
+      <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisSandbar" /> 🏖 Sandbars</label>
       <label class="layer-toggle"><input type="checkbox" id="layerDepths" /> Depth soundings (yours)</label>
       <label class="layer-toggle"><input type="checkbox" id="layerBathy" /> NH Bathymetry <small>(ref.)</small></label>
     </div>
@@ -1594,15 +1597,16 @@
       // device from a 2014/2016 reference directory; user-added entries
       // persist normally.
       layers.pois = L.layerGroup();
-      // Per-category sub-groups for the 5 sub-toggles (Restaurants / Hotels /
-      // Groceries / Historic / Dive). Markers live ONLY in their per-cat
-      // sub-group; layers.pois (master) is a placeholder for null-safety.
-      // See addPoiToLayer() / rebuildPoiLayer() for the routing rules.
+      // Per-category sub-groups for the 6 sub-toggles (Restaurants / Hotels /
+      // Groceries / Historic / Dive / Sandbar). Markers live ONLY in their
+      // per-cat sub-group; layers.pois (master) is a placeholder for
+      // null-safety. See addPoiToLayer() / rebuildPoiLayer() for routing.
       layers.poisRestaurants = L.layerGroup();
       layers.poisHotels      = L.layerGroup();
       layers.poisGroceries   = L.layerGroup();
       layers.poisHistorical  = L.layerGroup();
       layers.poisDive        = L.layerGroup();
+      layers.poisSandbar     = L.layerGroup();
       seedPoisIfNeeded();
       storedPois.forEach(p => addPoiToLayer(p));
       // Off by default — first-time visitors explore layers themselves.
@@ -1753,9 +1757,10 @@
       grocery:    { label: 'Grocery / store', icon: '🛒', cls: 'grocery' },
       historical: { label: 'Historic site', icon: '🏛', cls: 'historical' },
       dive:       { label: 'Submerged attraction (dive site)', icon: '🤿', cls: 'dive' },
+      sandbar:    { label: 'Sandbar / boat-gathering spot', icon: '🏖', cls: 'sandbar' },
     };
 
-    const POI_SEED_VERSION = '7';
+    const POI_SEED_VERSION = '8';
     const POI_SEED_FLAG_KEY = 'winniPoisV1Seeded';
 
     // Verified buoys seed (Tyler Hudson, 2026-07-08; 41 added 2026-07-09 = 480 total).
@@ -2089,6 +2094,56 @@
         name: 'Goodhue & Hawkins Navy Yard debris field',
         note: 'Decades of sunken hulls, barges, and engines from the old boatyard operations. Coordinates approximate.',
         source: 'Tyler reference list 2026-07-13 (community-contributed dive sites).' },
+
+      // ---- Sandbars & Boat-Gathering Spots ----
+      // Tyler reference list 2026-07-13. Coordinates approximate (sandbars
+      // shift seasonally with lake level, currents, and anchor use).
+      // Boater etiquette: idle-displacement only, stay clear of marked
+      // channels, mind the no-wake distance off anchored boats. Anchor by
+      // bow AND stern (bow-tie) where currents or wind warrant it.
+
+      // (Braun Bay — Moultonborough)
+      { cat: 'sandbar', lat: 43.67976108996222, lng: -71.38449714636438,
+        name: 'Braun Bay Sandbar',
+        note: "The lake's busiest, most social sandbar — and the site of a real lawsuit over a floating restaurant that anchors there. Coordinates approximate (sandbars shift with lake level). Idle-displacement only; expect heavy boat traffic weekends.",
+        source: 'Tyler reference list 2026-07-13 (community-contributed sandbar / gathering spots); news coverage of the Braun Bay floating-restaurant lawsuit.' },
+
+      // (West Alton — Smalls Cove)
+      { cat: 'sandbar', lat: 43.54650346656467, lng: -71.29326923609564,
+        name: 'West Alton Sandbar (Smalls Cove)',
+        note: 'Sandy bottom, popular with sail and power boats anchoring bow-and-stern. Coordinates approximate (sandbars shift with lake level).',
+        source: 'Tyler reference list 2026-07-13 (community-contributed sandbar / gathering spots).' },
+
+      // (Paugus Bay — near the Margate)
+      { cat: 'sandbar', lat: 43.5645869185933, lng: -71.45233192156326,
+        name: 'Paugus Bay Sandbar (near the Margate)',
+        note: 'Gradual slope, sandy to 8 ft; can get choppy from boat traffic. Coordinates approximate (sandbars shift with lake level).',
+        source: 'Tyler reference list 2026-07-13 (community-contributed sandbar / gathering spots).' },
+
+      // (Patrician Shores — Meredith, west of Two Mile Island)
+      { cat: 'sandbar', lat: 43.689844162233676, lng: -71.45300314517473,
+        name: 'Patrician Shores Sandbar',
+        note: "Quieter than Braun Bay. Watch for rocks. Coordinates approximate (sandbars shift with lake level).",
+        source: 'Tyler reference list 2026-07-13 (community-contributed sandbar / gathering spots).' },
+
+      // (Lake Winnisquam — separate lake, off the main map)
+      // NOTE: 43.510, -71.530 falls southwest of the default Winni map view.
+      // Lake Winnisquam is a separate lake connected to Winnipesaukee via
+      // the Winnipesaukee River; the marker will render off-map until a
+      // user zooms out / pans southwest. Kept in the seed because the
+      // POI category covers Lakes Region gathering spots, not strictly
+      // Winnipesaukee-only. If you'd rather drop it, bump POI_SEED_VERSION
+      // and remove this entry.
+      { cat: 'sandbar', lat: 43.510, lng: -71.530,
+        name: 'Lake Winnisquam sandbar',
+        note: 'A second, smaller sandbar scene just off the main lake — on Lake Winnisquam, NOT Lake Winnipesaukee (connected via the Winnipesaukee River). The marker falls outside the default Winni map view; zoom out or pan southwest to see it. Coordinates approximate.',
+        source: 'Tyler reference list 2026-07-13 (community-contributed sandbar / gathering spots).' },
+
+      // (Silver Sands)
+      { cat: 'sandbar', lat: 43.58271737167571, lng: -71.40730927503131,
+        name: 'Silver Sands Sandbar',
+        note: 'Coordinates approximate (sandbars shift with lake level).',
+        source: 'Tyler reference list 2026-07-13 (community-contributed sandbar / gathering spots).' },
     ];
 
     function seedPoisIfNeeded() {
@@ -2196,6 +2251,7 @@
         cat === 'hotel'      ? layers.poisHotels :
         cat === 'grocery'    ? layers.poisGroceries :
         cat === 'dive'       ? layers.poisDive :
+        cat === 'sandbar'    ? layers.poisSandbar :
                                layers.poisRestaurants;
       marker.addTo(subGroup);
     }
@@ -2204,14 +2260,14 @@
     // When the master flips, propagate to all sub-toggles; when a sub-toggle
     // flips, check/uncheck the master based on whether any sub is on.
     function refreshPoisMasterFromSubs() {
-      const subIds = ['layerPoisRestaurants', 'layerPoisHotels', 'layerPoisGroceries', 'layerPoisHistorical', 'layerPoisDive'];
+      const subIds = ['layerPoisRestaurants', 'layerPoisHotels', 'layerPoisGroceries', 'layerPoisHistorical', 'layerPoisDive', 'layerPoisSandbar'];
       const anyOn = subIds.some(id => document.getElementById(id) && document.getElementById(id).checked);
       document.getElementById('layerPois').checked = anyOn;
     }
 
     function refreshPoisSubsFromMaster() {
       const on = document.getElementById('layerPois').checked;
-      ['layerPoisRestaurants', 'layerPoisHotels', 'layerPoisGroceries', 'layerPoisHistorical', 'layerPoisDive']
+      ['layerPoisRestaurants', 'layerPoisHotels', 'layerPoisGroceries', 'layerPoisHistorical', 'layerPoisDive', 'layerPoisSandbar']
         .forEach(id => { const el = document.getElementById(id); if (el) el.checked = on; });
     }
 
@@ -2979,6 +3035,7 @@
         poi.cat === 'hotel'      ? 'layerPoisHotels' :
         poi.cat === 'grocery'    ? 'layerPoisGroceries' :
         poi.cat === 'dive'       ? 'layerPoisDive' :
+        poi.cat === 'sandbar'    ? 'layerPoisSandbar' :
                                    'layerPoisRestaurants';
       const subEl = document.getElementById(subId);
       if (subEl && !subEl.checked) {
@@ -4422,7 +4479,7 @@ ${tracks}
         // listeners handle their own addTo/removeLayer — we just sync state
         // and dispatch change events so the visual sync propagates.
         const on = e.target.checked;
-        ['layerPoisRestaurants', 'layerPoisHotels', 'layerPoisGroceries', 'layerPoisHistorical', 'layerPoisDive']
+        ['layerPoisRestaurants', 'layerPoisHotels', 'layerPoisGroceries', 'layerPoisHistorical', 'layerPoisDive', 'layerPoisSandbar']
           .forEach(id => {
             const el = document.getElementById(id);
             if (el && el.checked !== on) {
@@ -4441,6 +4498,7 @@ ${tracks}
         ['layerPoisGroceries',   layers.poisGroceries],
         ['layerPoisHistorical',  layers.poisHistorical],
         ['layerPoisDive',        layers.poisDive],
+        ['layerPoisSandbar',     layers.poisSandbar],
       ];
       subGroups.forEach(([id, grp]) => {
         document.getElementById(id).addEventListener('change', e => {
