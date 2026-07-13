@@ -1760,7 +1760,19 @@
       sandbar:    { label: 'Sandbar / boat-gathering spot', icon: '🏖', cls: 'sandbar' },
     };
 
-    const POI_SEED_VERSION = '8';
+    const POI_SEED_VERSION = '9';
+
+    // Entries to REMOVE from storedPois on the next version bump. The seed
+    // merge only adds/replaces; it can't drop a previously-seeded entry just
+    // by leaving it out of POI_SEED. So when retiring something, add a
+    // {cat, name} match here, bump POI_SEED_VERSION, and the removal runs
+    // alongside the rest of the merge. Leave this list empty when not
+    // actively retiring an entry.
+    const POI_REMOVED = [
+      // v9: retire Lake Winnisquam sandbar — it's on a different lake
+      // (Winnisquam, not Winnipesaukee) so doesn't belong on this map.
+      { cat: 'sandbar', name: 'Lake Winnisquam sandbar' },
+    ];
     const POI_SEED_FLAG_KEY = 'winniPoisV1Seeded';
 
     // Verified buoys seed (Tyler Hudson, 2026-07-08; 41 added 2026-07-09 = 480 total).
@@ -2126,18 +2138,10 @@
         note: "Quieter than Braun Bay. Watch for rocks. Coordinates approximate (sandbars shift with lake level).",
         source: 'Tyler reference list 2026-07-13 (community-contributed sandbar / gathering spots).' },
 
-      // (Lake Winnisquam — separate lake, off the main map)
-      // NOTE: 43.510, -71.530 falls southwest of the default Winni map view.
-      // Lake Winnisquam is a separate lake connected to Winnipesaukee via
-      // the Winnipesaukee River; the marker will render off-map until a
-      // user zooms out / pans southwest. Kept in the seed because the
-      // POI category covers Lakes Region gathering spots, not strictly
-      // Winnipesaukee-only. If you'd rather drop it, bump POI_SEED_VERSION
-      // and remove this entry.
-      { cat: 'sandbar', lat: 43.510, lng: -71.530,
-        name: 'Lake Winnisquam sandbar',
-        note: 'A second, smaller sandbar scene just off the main lake — on Lake Winnisquam, NOT Lake Winnipesaukee (connected via the Winnipesaukee River). The marker falls outside the default Winni map view; zoom out or pan southwest to see it. Coordinates approximate.',
-        source: 'Tyler reference list 2026-07-13 (community-contributed sandbar / gathering spots).' },
+      // (Lake Winnisquam — retired in v9. It was on Lake Winnisquam, a
+      //  separate lake southwest of Winnipesaukee connected via the
+      //  Winnipesaukee River. Doesn't belong on this map. Removed from
+      //  POI_SEED; existing devices drop it via POI_REMOVED on version bump.)
 
       // (Silver Sands)
       { cat: 'sandbar', lat: 43.58271737167571, lng: -71.40730927503131,
@@ -2145,6 +2149,9 @@
         note: 'Coordinates approximate (sandbars shift with lake level).',
         source: 'Tyler reference list 2026-07-13 (community-contributed sandbar / gathering spots).' },
     ];
+    // (Lake Winnisquam sandbar was seeded in v8 and retired in v9 — it's
+    //  on Lake Winnisquam, not Lake Winnipesaukee, so it doesn't belong
+    //  on this map. See POI_REMOVED for the explicit drop rule.)
 
     function seedPoisIfNeeded() {
       // One-shot seed: if a previous version never seeded this user, copy
@@ -2153,6 +2160,13 @@
       // re-runs the merge step so corrections (e.g. coord fixes like
       // The Dive v3 → v4) propagate to devices with an older seeded copy.
       if (localStorage.getItem(POI_SEED_FLAG_KEY) === POI_SEED_VERSION) return;
+      // First: retire any entries from POI_REMOVED. This runs before the
+      // add/replace loop so a retire+re-add cycle in the same bump works
+      // (entries can be moved between categories, etc.).
+      POI_REMOVED.forEach(r => {
+        const idx = storedPois.findIndex(x => x.cat === r.cat && x.name === r.name);
+        if (idx !== -1) storedPois.splice(idx, 1);
+      });
       POI_SEED.forEach(p => {
         // First: if a previous version of THIS exact entry is already stored
         // (same name + same category, regardless of coords), REPLACE the
