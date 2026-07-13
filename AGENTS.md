@@ -151,7 +151,9 @@ curl -sI -H 'Origin: https://lakewinni.goodbotai.tech' \
 cd /root/.openclaw/workspace/projects/winni-map && git status --short && git log --oneline -5
 ```
 
-## Open items / pending decisions
+6. **POI markers live in sub-groups ONLY — never also add to `layers.pois` master.** A previous version added every marker to both `layers.pois` and its per-category sub-group so the master toggle would "work." But then any sub-toggle check would trigger `layers.pois.addTo(map)`, putting every POI category on the map regardless of which sub was on. Master `layers.pois` is now an empty placeholder kept for null-safety in older code paths; visibility is driven solely by the four sub-groups (`layers.poisRestaurants` / `poisHotels` / `poisGroceries` / `poisHistorical`). If you add a new POI category, follow the same pattern: create a `layers.pois<Cat>` group, add its toggle to the panel, and only add markers to the sub-group.
+
+7. **Layers panel uses flex column, not stacked `max-height: 60vh`.** A previous version set both `#layers` and `#layers-body` to `max-height: 60vh`. On short/landscape viewports the body's content would clip past the last item (NH Bathymetry) and there was no `-webkit-overflow-scrolling: touch` for iOS. Now: `#layers` is `display: flex; flex-direction: column; max-height: calc(100vh - 100px);`, `#layers-header` is `flex: 0 0 auto;`, and `#layers-body` is `flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;`. Don't go back to stacked `max-height` on the body — the flex claim-and-scroll pattern is what makes NH Bathymetry reachable everywhere.
 
 - **VT double-post cron fix** — Tyler hasn't given go-ahead.
 - **No-wake zones** — removed 2026-07-05 (was inaccurate). Could come back as crowdsourced like buoys/hazards if Tyler wants them, but not requested yet.
