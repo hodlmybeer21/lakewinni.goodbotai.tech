@@ -754,7 +754,7 @@
     </div>
     <div id="layers-body">
       <label class="layer-toggle"><input type="checkbox" id="layerBuoys" /> Buoys</label>
-      <label class="layer-toggle" title="Shipped recommendations (orange) + your finger-drawn routes (blue dashed)"><input type="checkbox" id="layerRoutes" /> Routes</label>
+      <label class="layer-toggle" title="Shipped recommendations (teal) + your finger-drawn routes (blue dashed)"><input type="checkbox" id="layerRoutes" /> Routes</label>
       <label class="layer-toggle"><input type="checkbox" id="layerLaunches" /> Launches</label>
       <label class="layer-toggle"><input type="checkbox" id="layerMarinas" /> Marinas &amp; fuel</label>
       <label class="layer-toggle"><input type="checkbox" id="layerBridges" /> Bridges &amp; clearance <small>(off by default)</small></label>
@@ -1624,7 +1624,7 @@
       storedDepths.forEach(d => addDepthToLayer(d));
 
       // Routes — finger-drawn channels (anonymous, dashed blue) + shipped
-      // recommended routes (orange). Off by default — first-time visitors
+      // recommended routes (teal). Off by default — first-time visitors
       // explore layers themselves. Shipped routes are populated
       // asynchronously by seedShippedRoutesIfNeeded() after initMap
       // returns; user toggles on with the Routes checkbox.
@@ -3284,9 +3284,10 @@
       const latlngs = route.points.map(p => [p.lat, p.lng]);
       const line = L.polyline(latlngs, {
         color: '#1e6fd9',
-        weight: 4,
-        opacity: 0.9,
+        weight: 2.5,
+        opacity: 0.7,
         dashArray: '8, 8',
+        smoothFactor: 1.5,
         interactive: true,
       });
       line.on('click', e => {
@@ -3336,9 +3337,10 @@
     // ----- Shipped recommended routes (loaded from data/winni-routes.json) -----
     // Separate from storedRoutes (user finger-drawn). Cached in localStorage
     // with a version key so updates redeploy cleanly. Rendered in the SAME
-    // `layers.routes` group but with a distinct visual (solid orange-red, no
-    // dash, thinner) so users can tell shipped recommendations apart from
-    // personal scratch routes. No endpoint markers — those used to be green
+    // `layers.routes` group but with a distinct visual (solid muted teal, no
+    // dash, thinner, semi-transparent, smoothed) so it blends with water
+    // instead of fighting it. Personal scratch routes stay blue + dashed for
+    // differentiation. No endpoint markers — those used to be green
     // start / red end dots but competed visually with the ATON buoys
     // (red nun / green can) and made the map confusingly colored. The
     // polyline tap-popup still shows start/finish info when needed.
@@ -3370,10 +3372,11 @@
       if (!route.points || route.points.length < 2) return;
       const latlngs = route.points.map(p => [p.lat, p.lng]);
       const line = L.polyline(latlngs, {
-        color: '#d94e1e',     // burnt orange-red — clearly different from user blue
-        weight: 3,
-        opacity: 0.9,
+        color: '#3a7d8a',     // muted nautical teal — blends with water, less visual noise than orange
+        weight: 2.5,
+        opacity: 0.65,
         dashArray: null,      // solid line for "official" routes
+        smoothFactor: 1.5,    // gentle smoothing — reads as boat movement, not rigid GPS segments
         interactive: true,
       });
       // Detect closed loops (start and end within ~50m of each other).
@@ -4538,7 +4541,7 @@ ${tracks}
             Tap 🛶 to view, rename, export (GPX), or delete past trips.<br>
             Tap the 🚤 boat icon to pick your vessel — the icon shown at your GPS location. 9 options from speedboat to mermaid. Your choice is saved locally and applied immediately.<br>
             Trips auto-record while GPS is on and auto-save when you stop.<br>
-            Tap a shipped (orange) route line for label, distance, GPX export, and "Route to start" in Google Maps.
+            Tap a shipped (teal) route line for label, distance, GPX export, and "Route to start" in Google Maps.
           </p>
           <p style="font-size:12px;color:#666;">
             <strong>Buoys saved locally:</strong> ${storedBuoys.length}<br>
