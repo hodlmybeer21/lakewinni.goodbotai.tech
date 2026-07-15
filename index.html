@@ -1765,7 +1765,7 @@
       beach:      { label: 'Public beach / swim area', icon: '⛱', cls: 'beach' },
     };
 
-    const POI_SEED_VERSION = '10';
+    const POI_SEED_VERSION = '11';
 
     // Entries to REMOVE from storedPois on the next version bump. The seed
     // merge only adds/replaces; it can't drop a previously-seeded entry just
@@ -1905,6 +1905,11 @@
         name: 'Oliver Lodge (Meredith)',
         note: 'Meredith. hotel directory (2016).',
         source: 'Lake Winnipesaukee hotel directory (2016): "Oliver Lodge"' },
+
+      { cat: 'restaurant', lat: 43.6550, lng: -71.4973,
+        name: 'Town Docks Restaurant (Summers Only)',
+        note: 'Meredith, 289 Daniel Webster Hwy. Seasonal — summer only; docks present. Coordinates per Google Maps Place pin (~80 m east of the Meredith town docks anchor used by the directory hotels above).',
+        source: 'Google Maps Place — https://maps.app.goo.gl/HmL3jYGYZ8tKL9ge7 (Tyler reference 2026-07-15)' },
 
       // ---- Weirs Beach / Laconia (Paugus Bay mouth, 43.6080, -71.4615) ----
       { cat: 'restaurant', lat: 43.6080, lng: -71.4615,
