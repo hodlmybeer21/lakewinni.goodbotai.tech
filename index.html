@@ -210,6 +210,45 @@
       background: #2980b9;
       box-shadow: 0 0 0 3px rgba(41,128,185,0.4), 0 3px 8px rgba(0,0,0,0.35);
     }
+    .icon-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    /* Trip-record button: red recording state with pulse halo */
+    #tripRecBtn.recording {
+      background: #c0392b;
+      box-shadow: 0 0 0 3px rgba(192,57,43,0.45), 0 3px 8px rgba(0,0,0,0.35);
+      animation: tripRecPulse 1.4s ease-in-out infinite;
+    }
+    @keyframes tripRecPulse {
+      0%, 100% { box-shadow: 0 0 0 0   rgba(192,57,43,0.55), 0 3px 8px rgba(0,0,0,0.35); }
+      50%      { box-shadow: 0 0 0 10px rgba(192,57,43,0.0),  0 3px 8px rgba(0,0,0,0.35); }
+    }
+    /* HUD REC indicator (hidden by default; .on when trip recording) */
+    .hud-rec {
+      display: none;
+      align-items: center;
+      gap: 3px;
+      color: #ff8585;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-right: 6px;
+    }
+    .hud-rec.on { display: inline-flex; }
+    .hud-rec-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ff3b3b;
+      box-shadow: 0 0 0 0 rgba(255,59,59,0.6);
+      animation: hudRecPulse 1.2s ease-in-out infinite;
+    }
+    @keyframes hudRecPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,59,59,0.6); }
+      50%      { box-shadow: 0 0 0 6px rgba(255,59,59,0); }
+    }
     /* Layers panel (top-right) */
     #layers {
       top: 80px;
@@ -788,6 +827,7 @@
       </div>
     </div>
     <div class="hud-gps">
+      <span class="hud-rec" id="hudRec"><span class="hud-rec-dot"></span>REC</span>
       <span id="hudGpsDot" class="hud-gps-dot"></span>
       <span id="hudGpsText">GPS off</span>
     </div>
@@ -798,6 +838,7 @@
     <button class="icon-btn" id="recenterBtn" title="Recenter on me">⊙</button>
     <button class="icon-btn" id="buoyModeBtn" title="Add buoy mode">📍</button>
     <button class="icon-btn" id="routeModeBtn" title="Draw route mode">✏️</button>
+    <button class="icon-btn" id="tripRecBtn" title="Record trip (start GPS first)" disabled>⏺</button>
     <button class="icon-btn" id="tripsBtn" title="Trips">🛶</button>
     <button class="icon-btn" id="exportBtn" title="Export data">💾</button>
     <button class="icon-btn" id="rescueBtn" title="Where am I — share my location / call for help">🆘</button>
@@ -3834,10 +3875,12 @@ ${trkpts}
         started: new Date().toISOString(),
         points: [],
       };
+      // Live trip line goes into layers.trips so the Trips layer toggle
+      // governs its visibility (consistent with saved trips). Was .addTo(map).
       currentTripLine = L.polyline([], {
         color: '#1abc9c', weight: 4, opacity: 0.9,
         dashArray: '6, 6', lineCap: 'round',
-      }).addTo(map);
+      }).addTo(layers.trips);
     }
 
     function appendTripPoint(lat, lng, speedKn, headingDeg) {
@@ -3858,7 +3901,7 @@ ${trkpts}
       if (!currentTrip) return null;
       const trip = currentTrip;
       currentTrip = null;
-      if (currentTripLine) { map.removeLayer(currentTripLine); currentTripLine = null; }
+      if (currentTripLine) { layers.trips.removeLayer(currentTripLine); currentTripLine = null; }
       if (trip.points.length >= 2) {
         storedTrips.push(trip);
         saveTrips();
@@ -3869,6 +3912,57 @@ ${trkpts}
         return trip;
       }
       return null;
+    }
+
+    // ----- Trip recording controls (separate from GPS) -----
+    // Trip recording is an explicit, intentional action controlled by the
+    // ⏺ button (#tripRecBtn). Requires GPS to be on (you can't record
+    // positions without positions). Started/stopped by startTripRecording()
+    // and stopTripRecording(); state mirrored to the button + HUD indicator
+    // via updateTripRecButton().
+    function startTripRecording() {
+      if (watchId === null || currentTrip) return;
+      startNewTrip('Trip ' + new Date().toLocaleString());
+      // Auto-enable the Trips layer so the user sees the line draw live.
+      const layerTripsCheckbox = document.getElementById('layerTrips');
+      if (layerTripsCheckbox && !layerTripsCheckbox.checked) {
+        layerTripsCheckbox.checked = true;
+        if (layers.trips) layers.trips.addTo(map);
+      }
+      updateTripRecButton();
+    }
+
+    function stopTripRecording() {
+      if (!currentTrip) return;
+      const pointCount = currentTrip.points.length;
+      const finishedTrip = finishTrip();
+      updateTripRecButton();
+      if (finishedTrip) {
+        promptNameTrip(finishedTrip);
+      } else {
+        // Trip had <2 GPS points — not enough to save. Tell the user why.
+        flashRouteMessage(
+          `⚠ Trip discarded (only ${pointCount} GPS point${pointCount === 1 ? '' : 's'} — need at least 2).`,
+          3000
+        );
+      }
+    }
+
+    function updateTripRecButton() {
+      const btn = document.getElementById('tripRecBtn');
+      const hudRec = document.getElementById('hudRec');
+      if (!btn) return;
+      const gpsOn = watchId !== null;
+      const recording = currentTrip !== null;
+      btn.disabled = !gpsOn;
+      btn.classList.toggle('recording', recording);
+      btn.textContent = recording ? '⏹' : '⏺';
+      btn.title = !gpsOn
+        ? 'Record trip (start GPS first)'
+        : recording
+          ? 'Stop recording this trip'
+          : 'Record this trip';
+      if (hudRec) hudRec.classList.toggle('on', recording);
     }
 
     window.deleteTrip = function(id) {
@@ -3956,8 +4050,10 @@ ${tracks}
         return;
       }
       setGpsStatus('Acquiring GPS…', 'acquiring');
-      // Start a fresh trip recording for this session
-      startNewTrip('Trip ' + new Date().toLocaleString());
+      // Trip recording is now an explicit, separate action — see
+      // #tripRecBtn / startTripRecording(). The button is enabled here
+      // so the user can opt in independently of the GPS session.
+      updateTripRecButton();
       watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
         enableHighAccuracy: true,
         maximumAge: 1000,
@@ -3973,6 +4069,16 @@ ${tracks}
     }
 
     function stopTracking() {
+      // If a trip is in progress, finish it first so the user doesn't
+      // lose the session — Stop GPS ends the GPS session, so it should
+      // also end the trip. Prompt for a name as usual.
+      if (currentTrip) {
+        const finishedTrip = finishTrip();
+        updateTripRecButton();
+        if (finishedTrip) {
+          promptNameTrip(finishedTrip);
+        }
+      }
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
@@ -3991,12 +4097,8 @@ ${tracks}
       document.getElementById('speed').textContent = '0.0';
       document.getElementById('heading').textContent = '—';
       window.removeEventListener('deviceorientation', onOrient);
-
-      // Finish the trip: if it has enough points, prompt to name it
-      const finishedTrip = finishTrip();
-      if (finishedTrip) {
-        promptNameTrip(finishedTrip);
-      }
+      // GPS off → trip recording is unavailable; sync the button.
+      updateTripRecButton();
     }
 
     function promptNameTrip(trip) {
@@ -4496,6 +4598,15 @@ ${tracks}
         if (buoyAddMode) exitBuoyMode();
         else enterBuoyMode();
       });
+
+      // Trip-record button: ⏺ starts a trip, ⏹ stops one. Independent of
+      // the GPS lifecycle — the button is disabled while GPS is off.
+      document.getElementById('tripRecBtn').addEventListener('click', () => {
+        if (currentTrip) stopTripRecording();
+        else startTripRecording();
+      });
+      // Initialize the button state on boot (disabled, since GPS is off).
+      updateTripRecButton();
 
       document.getElementById('routeModeBtn').addEventListener('click', () => {
         if (routeDrawMode) exitRouteDrawMode();
