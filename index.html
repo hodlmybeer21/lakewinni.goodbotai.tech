@@ -4050,10 +4050,6 @@ ${tracks}
         return;
       }
       setGpsStatus('Acquiring GPS…', 'acquiring');
-      // Trip recording is now an explicit, separate action — see
-      // #tripRecBtn / startTripRecording(). The button is enabled here
-      // so the user can opt in independently of the GPS session.
-      updateTripRecButton();
       watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
         enableHighAccuracy: true,
         maximumAge: 1000,
@@ -4061,6 +4057,12 @@ ${tracks}
       });
       document.getElementById('startBtn').textContent = 'Stop GPS';
       document.getElementById('startBtn').classList.add('tracking');
+      // Trip recording is now an explicit, separate action — see
+      // #tripRecBtn / startTripRecording(). Sync the button + HUD
+      // state AFTER watchId is set; calling it earlier (before
+      // 2026-07-25 fix) read watchId===null and locked the button
+      // disabled for the rest of the session.
+      updateTripRecButton();
 
       // Try to use device orientation for heading if available
       if (window.DeviceOrientationEvent) {
