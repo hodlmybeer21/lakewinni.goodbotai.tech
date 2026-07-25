@@ -3901,6 +3901,17 @@ ${trkpts}
       if (!currentTrip) return null;
       const trip = currentTrip;
       currentTrip = null;
+      // Stamp the user's current position as the LAST point of the trip so
+      // even an instant ⏺→⏹ produces a 2-point trip (start + end). Skipped
+      // if no GPS fix has arrived (lastPos null on a fresh Start GPS).
+      // The matching start-seed lives in startTripRecording() below.
+      if (lastPos) {
+        trip.points.push({
+          t: new Date().toISOString(),
+          lat: lastPos.lat, lng: lastPos.lng,
+          speedKn: 0, headingDeg: null,
+        });
+      }
       if (currentTripLine) { layers.trips.removeLayer(currentTripLine); currentTripLine = null; }
       if (trip.points.length >= 2) {
         storedTrips.push(trip);
@@ -3929,20 +3940,34 @@ ${trkpts}
         layerTripsCheckbox.checked = true;
         if (layers.trips) layers.trips.addTo(map);
       }
+      // Seed the trip with the user's current position (from the last GPS
+      // fix), so even an instant ⏺→⏹ produces a non-empty trip. The matching
+      // end-stamp lives in finishTrip() above. Skipped if no GPS fix has
+      // arrived yet (lastPos is null on a fresh Start GPS).
+      if (lastPos) {
+        currentTrip.points.push({
+          t: new Date().toISOString(),
+          lat: lastPos.lat, lng: lastPos.lng,
+          speedKn: 0, headingDeg: null,
+        });
+        if (currentTripLine) currentTripLine.addLatLng([lastPos.lat, lastPos.lng]);
+      }
       updateTripRecButton();
     }
 
     function stopTripRecording() {
       if (!currentTrip) return;
-      const pointCount = currentTrip.points.length;
       const finishedTrip = finishTrip();
       updateTripRecButton();
       if (finishedTrip) {
         promptNameTrip(finishedTrip);
       } else {
-        // Trip had <2 GPS points — not enough to save. Tell the user why.
+        // finishTrip() seeds start (in startTripRecording) AND stamps end
+        // (above) from lastPos. This branch only fires if lastPos was null
+        // for both — i.e. no GPS fix arrived at all during the recording
+        // window. Tell the user to wait for GPS before tapping ⏺.
         flashRouteMessage(
-          `⚠ Trip discarded (only ${pointCount} GPS point${pointCount === 1 ? '' : 's'} — need at least 2).`,
+          `⚠ Trip discarded — no GPS fix yet. Wait a moment after Start GPS for a position, then try again.`,
           3000
         );
       }
