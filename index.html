@@ -589,6 +589,7 @@
       justify-content: center;
       box-shadow: 0 6px 14px rgba(15, 118, 110, 0.45);
       transition: transform 0.12s ease, background 0.15s ease;
+      flex-shrink: 0;
     }
     .fab:hover { background: var(--teal-800); }
     .fab:active { transform: scale(0.95); }
@@ -603,6 +604,78 @@
       background: #c0392b;
       animation: tripRecPulse 1.4s ease-in-out infinite;
     }
+    /* More menu — vertical popover above the More button.
+       Anchored right-aligned so it doesn't push past the viewport on
+       narrow phones. max-width + viewport clamp guarantee no horizontal
+       overflow on any device. */
+    #moreMenu {
+      position: absolute;
+      bottom: calc(100% + 10px);
+      right: 0;
+      display: none;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 2px;
+      min-width: 200px;
+      max-width: min(280px, calc(100vw - 24px));
+      padding: 6px;
+      background: var(--white);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      z-index: 1100;
+    }
+    #moreMenu.show { display: flex; }
+    /* Caret pointing down at the More button */
+    #moreMenu::after {
+      content: "";
+      position: absolute;
+      bottom: -7px;
+      right: 22px;
+      width: 14px;
+      height: 14px;
+      background: var(--white);
+      transform: rotate(45deg);
+      border-radius: 2px;
+      box-shadow: 1px 1px 2px rgba(15, 23, 42, 0.06);
+      z-index: -1;
+    }
+    #moreMenu .menu-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--gray-400);
+      font-weight: 700;
+      padding: 6px 12px 2px;
+    }
+    #moreMenu .action-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--gray-800);
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      white-space: nowrap;
+    }
+    #moreMenu .action-chip:hover { background: var(--gray-100); }
+    #moreMenu .action-chip .ico {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    #moreMenu .action-chip.primary {
+      background: var(--teal-700);
+      color: var(--white);
+    }
+    #moreMenu .action-chip.primary:hover { background: var(--teal-800); }
+    /* Outside-the-scope chip styles (legacy inline-flex) kept for safety */
     .action-chip {
       display: inline-flex;
       align-items: center;
