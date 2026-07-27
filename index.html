@@ -1116,10 +1116,24 @@
     #layers.collapsed #layers-header {
       border-bottom: none;
     }
-    /* Mobile: layers panel hugs the right edge a touch tighter */
+    /* Mobile: layers panel narrower + shorter so it stops overlapping the
+       HUD (left) and the action sheet (bottom). #layers-body keeps its
+       overflow-y: auto so all 14 items remain reachable by scrolling. */
     @media (max-width: 600px) {
-      #layers { right: 8px; min-width: 0; }
+      #layers {
+        right: 8px;
+        left: auto;
+        min-width: 0;
+        /* Cap width so it never crowds the left-side HUD.
+           At 360px viewport: ~190px; at 412px+: capped at 200px. */
+        width: min(200px, calc(100vw - 170px));
+        /* Stop above the bottom action sheet; body scrolls to the rest. */
+        max-height: 50vh;
+      }
       #layers-header { padding: 8px 12px; font-size: 13px; }
+      /* Pinch-to-zoom on mobile replaces Leaflet's +/- buttons;
+         desktop keeps them. */
+      .leaflet-control-zoom { display: none !important; }
     }
     #layers-header {
       display: flex;
