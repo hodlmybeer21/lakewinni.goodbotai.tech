@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14b8a6"/>
+      <stop offset="1" stop-color="#0f766e"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5eead4"/>
+      <stop offset="1" stop-color="#0d9488"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.78" cy="0.2" r="0.32">
+      <stop offset="0" stop-color="#fff7d6" stop-opacity="0.95"/>
+      <stop offset="0.6" stop-color="#fde68a" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#fde68a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- rounded square mask -->
+  <rect x="0" y="0" width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- sky -->
+  <rect x="0" y="0" width="512" height="512" rx="96" fill="url(#sun)"/>
+  <!-- water -->
+  <path d="M0,300 L512,260 L512,512 L0,512 Z" fill="url(#water)"/>
+  <!-- ripples -->
+  <g stroke="#ccfbf1" stroke-opacity="0.45" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M40,360 Q160,348 280,360 T480,360"/>
+    <path d="M20,400 Q160,388 300,400 T500,400"/>
+    <path d="M40,440 Q180,428 320,440 T500,440"/>
+  </g>
+  <!-- islands -->
+  <g fill="#fef3c7" stroke="#d97706" stroke-opacity="0.5" stroke-width="3">
+    <path d="M70,330 Q120,310 180,325 Q220,335 210,360 Q170,385 110,378 Q60,368 70,330 Z"/>
+    <path d="M230,310 Q300,290 360,308 Q405,320 390,345 Q340,370 280,360 Q225,348 230,310 Z"/>
+    <path d="M390,345 Q430,330 470,342 Q495,350 485,372 Q450,395 410,388 Q380,378 390,345 Z"/>
+  </g>
+  <!-- boat silhouette (white) -->
+  <g transform="translate(370,300)">
+    <path d="M-32,0 L26,0 L20,10 L-26,10 Z" fill="#ffffff"/>
+    <path d="M-4,-32 L-4,0 L-22,0 Z" fill="#ffffff"/>
+    <circle cx="-4" cy="-32" r="2.5" fill="#0f766e"/>
+  </g>
+  <!-- soft teal track -->
+  <path d="M70,360 Q170,380 290,345 Q400,320 470,340" fill="none"
+        stroke="#ffffff" stroke-width="6" stroke-linecap="round"
+        stroke-dasharray="10 10" opacity="0.85"/>
+</svg>

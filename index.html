@@ -2,11 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#0a3d62" />
-  <title>Winni Nav</title>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Winni Nav" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="description" content="The living map of Lake Winnipesaukee. Live GPS, community hazards, local spots — free to start." />
+  <meta property="og:title" content="Winni Nav – The living map of Lake Winnipesaukee" />
+  <meta property="og:description" content="Live GPS · Community hazards · Local spots · Free to start. Built for boaters, works as a PWA." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://lakewinni.goodbotai.tech" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <title>Winni Nav – The living map of Lake Winnipesaukee</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -14,6 +25,709 @@
     crossorigin=""
   />
   <style>
+    /* ====================================================================
+       Winni Nav — design tokens, landing page, PWA polish
+       Soft lake teal as the primary accent; clean whites/grays;
+       high contrast for sunlight readability.
+       ==================================================================== */
+    :root {
+      /* Lake teal palette (primary accent) */
+      --teal-50:  #f0fdfa;
+      --teal-100: #ccfbf1;
+      --teal-200: #99f6e4;
+      --teal-300: #5eead4;
+      --teal-400: #2dd4bf;
+      --teal-500: #14b8a6;
+      --teal-600: #0d9488;
+      --teal-700: #0f766e;
+      --teal-800: #115e59;
+      --teal-900: #134e4a;
+
+      /* Neutrals — clean, sunlight-readable */
+      --white:    #ffffff;
+      --gray-50:  #f8fafc;
+      --gray-100: #f1f5f9;
+      --gray-200: #e2e8f0;
+      --gray-300: #cbd5e1;
+      --gray-400: #94a3b8;
+      --gray-500: #64748b;
+      --gray-600: #475569;
+      --gray-700: #334155;
+      --gray-800: #1e293b;
+      --gray-900: #0f172a;
+
+      /* Accents */
+      --gold-300: #fcd34d;
+      --gold-400: #fbbf24;
+      --gold-500: #f59e0b;
+      --gold-600: #d97706;
+      --coral:    #fb7185;
+      --sky:      #38bdf8;
+      --navy:     #0a3d62; /* legacy HUD background — kept for contrast on water */
+
+      /* Track & route colors */
+      --track:        var(--teal-400);   /* soft teal trip/track lines */
+      --track-glow:   rgba(45, 212, 191, 0.35);
+      --route-shipped:#f59e0b;           /* shipped routes — keep orange for visual distinction */
+      --route-user:   var(--teal-400);   /* user finger-drawn — soft teal dashed */
+
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
+      --shadow:    0 4px 12px rgba(15, 23, 42, 0.12);
+      --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.18);
+
+      /* Radii */
+      --radius-sm: 8px;
+      --radius:    12px;
+      --radius-lg: 18px;
+      --radius-xl: 24px;
+    }
+
+    /* ====================================================================
+       Landing page (default view for first-time visitors)
+       ==================================================================== */
+    html, body.landing-open { overflow-y: auto; }
+    body.landing-open { background: var(--gray-50); }
+
+    #landing {
+      display: none;
+      min-height: 100vh;
+      background: linear-gradient(180deg, var(--white) 0%, var(--gray-50) 100%);
+      color: var(--gray-900);
+    }
+    body.landing-open #landing { display: block; }
+    body.landing-open #app { display: none !important; }
+
+    .landing-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .landing-nav .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 18px;
+      color: var(--gray-900);
+    }
+    .landing-nav .brand-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--teal-400) 0%, var(--teal-600) 100%);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--white);
+      font-size: 18px;
+      box-shadow: var(--shadow-sm);
+    }
+    .landing-nav a.nav-link {
+      color: var(--gray-700);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      padding: 8px 14px;
+      border-radius: var(--radius);
+      transition: background 0.15s ease;
+    }
+    .landing-nav a.nav-link:hover { background: var(--gray-100); }
+    .landing-nav .nav-cta {
+      background: var(--teal-700);
+      color: var(--white);
+    }
+    .landing-nav .nav-cta:hover { background: var(--teal-800); color: var(--white); }
+
+    /* Hero */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 32px 24px 56px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      opacity: 0.95;
+      pointer-events: none;
+    }
+    .hero-bg svg { width: 100%; height: 100%; display: block; }
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 640px;
+    }
+    .hero h1 {
+      font-size: clamp(32px, 5.5vw, 48px);
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      margin: 0 0 14px;
+      color: var(--gray-900);
+      font-weight: 800;
+    }
+    .hero .subhead {
+      font-size: clamp(15px, 2.2vw, 18px);
+      color: var(--gray-600);
+      margin: 0 0 28px;
+      line-height: 1.5;
+    }
+    .hero .cta-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 22px;
+      border: none;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.12s ease, box-shadow 0.15s ease, background 0.15s ease;
+      line-height: 1;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: var(--teal-700);
+      color: var(--white);
+      box-shadow: 0 6px 18px rgba(15, 118, 110, 0.35);
+    }
+    .btn-primary:hover { background: var(--teal-800); color: var(--white); }
+    .btn-secondary {
+      background: var(--white);
+      color: var(--gray-800);
+      border: 1px solid var(--gray-200);
+      box-shadow: var(--shadow-sm);
+    }
+    .btn-secondary:hover { background: var(--gray-50); }
+
+    /* Trust strip */
+    .trust-strip {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 14px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      color: var(--gray-500);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .trust-strip .dot { color: var(--gray-300); }
+
+    /* Section base */
+    .section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 56px 24px;
+    }
+    .section h2 {
+      font-size: clamp(22px, 3vw, 28px);
+      margin: 0 0 8px;
+      color: var(--gray-900);
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+    .section .section-sub {
+      color: var(--gray-500);
+      margin: 0 0 28px;
+      font-size: 15px;
+    }
+
+    /* Value props */
+    .value-props {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+    }
+    .prop {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      box-shadow: var(--shadow-sm);
+    }
+    .prop-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--teal-100) 0%, var(--teal-200) 100%);
+      color: var(--teal-800);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 14px;
+    }
+    .prop h3 {
+      font-size: 16px;
+      margin: 0 0 6px;
+      color: var(--gray-900);
+      font-weight: 700;
+    }
+    .prop p {
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--gray-600);
+      margin: 0;
+    }
+
+    /* How it works */
+    .how-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 18px;
+      counter-reset: step;
+    }
+    .how-step {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      position: relative;
+      counter-increment: step;
+    }
+    .how-step::before {
+      content: counter(step);
+      position: absolute;
+      top: -14px;
+      left: 20px;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--teal-700);
+      color: var(--white);
+      font-weight: 800;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(15, 118, 110, 0.3);
+    }
+    .how-step h3 {
+      font-size: 15px;
+      margin: 6px 0 4px;
+      color: var(--gray-900);
+      font-weight: 700;
+    }
+    .how-step p {
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--gray-600);
+      margin: 0;
+    }
+
+    /* Safety disclaimer (landing) */
+    .safety {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px 32px;
+    }
+    .safety-inner {
+      background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+      border: 1px solid #fcd34d;
+      border-radius: var(--radius-lg);
+      padding: 18px 22px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      color: #78350f;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .safety-inner strong { color: #92400e; }
+    .safety-inner .ico { font-size: 20px; line-height: 1; }
+
+    /* Footer */
+    .landing-footer {
+      border-top: 1px solid var(--gray-200);
+      background: var(--white);
+      padding: 32px 24px;
+      color: var(--gray-600);
+      font-size: 13px;
+    }
+    .landing-footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 28px;
+    }
+    @media (max-width: 720px) {
+      .landing-footer-inner { grid-template-columns: 1fr; }
+    }
+    .landing-footer h4 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--gray-500);
+      margin: 0 0 10px;
+      font-weight: 700;
+    }
+    .landing-footer ul { list-style: none; padding: 0; margin: 0; }
+    .landing-footer li { margin-bottom: 6px; }
+    .landing-footer a {
+      color: var(--gray-700);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .landing-footer a:hover { color: var(--teal-700); text-decoration: underline; }
+    .landing-footer .small {
+      font-size: 11px;
+      color: var(--gray-500);
+      max-width: 60ch;
+      line-height: 1.5;
+      margin-top: 6px;
+    }
+    .landing-footer .copyright {
+      max-width: 1100px;
+      margin: 24px auto 0;
+      padding-top: 18px;
+      border-top: 1px solid var(--gray-200);
+      color: var(--gray-400);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    /* ====================================================================
+       App view — clean top bar, labeled FAB actions, soft teal tracks
+       ==================================================================== */
+
+    /* Soft teal route/track lines (overrides) */
+    .leaflet-overlay-pane svg path[stroke="#1abc9c"] {
+      stroke: var(--track) !important;
+      filter: drop-shadow(0 0 6px var(--track-glow));
+    }
+
+    /* Top bar — slimmer, cleaner */
+    #topbar {
+      background: linear-gradient(180deg, rgba(10, 61, 98, 0.94) 0%, rgba(10, 61, 98, 0.55) 80%, rgba(10, 61, 98, 0) 100%);
+      padding: 10px 14px 28px;
+    }
+    #topbar #title {
+      font-size: 16px;
+    }
+    #topbar #title small {
+      font-size: 10px;
+    }
+    #startBtn {
+      background: var(--teal-700);
+      font-weight: 700;
+    }
+    #startBtn.tracking {
+      background: #c0392b;
+    }
+
+    /* Back-to-landing chip */
+    #backToLanding {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      color: var(--white);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      backdrop-filter: blur(6px);
+    }
+    #backToLanding:hover { background: rgba(255, 255, 255, 0.24); }
+    body.app-view #backToLanding { display: inline-flex; }
+
+    /* Search bar (top center, app view only) */
+    #searchBar {
+      position: absolute;
+      top: env(safe-area-inset-top, 0);
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: 8px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      width: min(360px, calc(100vw - 32px));
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: 999px;
+      padding: 8px 12px;
+      box-shadow: var(--shadow);
+      z-index: 1100;
+    }
+    #searchBar input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-size: 14px;
+      color: var(--gray-800);
+      font-family: inherit;
+    }
+    #searchBar .search-ico { color: var(--gray-400); font-size: 16px; }
+    #searchBar .search-clear {
+      background: transparent;
+      border: none;
+      color: var(--gray-400);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+    }
+    #searchResults {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 0) + 52px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(360px, calc(100vw - 32px));
+      max-height: 50vh;
+      overflow-y: auto;
+      background: var(--white);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      display: none;
+      z-index: 1100;
+      padding: 6px;
+    }
+    #searchResults.show { display: block; }
+    .search-result {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--gray-800);
+    }
+    .search-result:hover, .search-result.active { background: var(--teal-50); color: var(--teal-800); }
+    .search-result .ico { font-size: 18px; width: 22px; text-align: center; }
+    .search-result .meta { font-size: 11px; color: var(--gray-500); }
+    .search-empty {
+      padding: 16px;
+      text-align: center;
+      color: var(--gray-400);
+      font-size: 13px;
+    }
+    body.app-view #searchBar { display: flex; }
+
+    /* Action sheet (bottom) — labeled, soft teal primary */
+    #actions {
+      bottom: env(safe-area-inset-bottom, 16px);
+      right: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    /* Hide the legacy dense action bar — replaced by the bottom sheet below */
+    #actions .icon-btn { display: none; }
+    .icon-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: rgba(10,61,98,0.92);
+      color: var(--white);
+      border: none;
+      font-size: 22px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon-btn.active {
+      background: var(--teal-700);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.4), 0 3px 8px rgba(0,0,0,0.35);
+    }
+    .icon-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* New bottom action sheet — primary FAB + secondary labeled chips */
+    #actionSheet {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(env(safe-area-inset-bottom, 16px) + 16px);
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 6px;
+      background: rgba(255, 255, 255, 0.97);
+      border-radius: 999px;
+      box-shadow: var(--shadow-lg);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      max-width: calc(100vw - 32px);
+    }
+    body.app-view #actionSheet { display: flex; }
+    .fab {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: var(--teal-700);
+      color: var(--white);
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 14px rgba(15, 118, 110, 0.45);
+      transition: transform 0.12s ease, background 0.15s ease;
+    }
+    .fab:hover { background: var(--teal-800); }
+    .fab:active { transform: scale(0.95); }
+    .fab.secondary {
+      background: var(--gray-100);
+      color: var(--gray-700);
+      box-shadow: none;
+    }
+    .fab.secondary:hover { background: var(--gray-200); }
+    .fab.danger { background: #c0392b; }
+    .fab.recording {
+      background: #c0392b;
+      animation: tripRecPulse 1.4s ease-in-out infinite;
+    }
+    .action-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--gray-700);
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .action-chip:hover { background: var(--gray-100); }
+    .action-chip .ico { font-size: 16px; }
+    .action-chip.primary {
+      background: var(--teal-700);
+      color: var(--white);
+    }
+    .action-chip.primary:hover { background: var(--teal-800); }
+
+    /* PWA install banner */
+    #pwaInstall {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(env(safe-area-inset-bottom, 16px) + 80px);
+      background: var(--gray-900);
+      color: var(--white);
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      display: none;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      z-index: 1100;
+      max-width: calc(100vw - 32px);
+    }
+    #pwaInstall.show { display: flex; }
+    #pwaInstall button {
+      background: var(--teal-500);
+      color: var(--white);
+      border: none;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #pwaInstall button.dismiss {
+      background: transparent;
+      color: var(--gray-400);
+      padding: 4px 8px;
+    }
+    #pwaInstall button.dismiss:hover { color: var(--white); }
+
+    /* Improved layers panel — section headers */
+    #layers-body .layer-section {
+      padding-top: 10px;
+      margin-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    #layers-body .layer-section:first-child {
+      border-top: none;
+      padding-top: 4px;
+      margin-top: 0;
+    }
+    #layers-body .layer-section-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--teal-300);
+      opacity: 0.9;
+      font-weight: 700;
+      margin-bottom: 4px;
+      padding-left: 4px;
+    }
+
+    /* Premium / sponsored pin placeholder (Phase 2) */
+    .sponsored-pin {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--gold-400), var(--gold-600));
+      color: var(--white);
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(217, 119, 6, 0.4);
+      border: 2px solid var(--white);
+    }
+    .sponsored-tag {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--gold-600);
+      background: #fef3c7;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    /* Footer for app view (overlay on map) */
+    .app-foot-link {
+      position: absolute;
+      bottom: env(safe-area-inset-bottom, 8px);
+      left: 8px;
+      color: rgba(255, 255, 255, 0.55);
+      font-size: 10px;
+      text-decoration: none;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(10, 61, 98, 0.5);
+      backdrop-filter: blur(4px);
+      z-index: 999;
+    }
+    .app-foot-link:hover { color: var(--white); background: rgba(10, 61, 98, 0.75); }
+
     html, body {
       margin: 0;
       padding: 0;
@@ -761,12 +1475,189 @@
   </style>
 </head>
 <body>
+  <!-- ================================================================
+       Landing page (default view for first-time visitors)
+       ================================================================ -->
+  <div id="landing" aria-label="Winni Nav landing">
+    <nav class="landing-nav">
+      <a href="#" class="brand" onclick="showLanding(); return false;" aria-label="Winni Nav home">
+        <span class="brand-mark" aria-hidden="true">⛵</span>
+        <span>Winni Nav</span>
+      </a>
+      <div style="display:flex;gap:4px;align-items:center;">
+        <a href="#how" class="nav-link">How it works</a>
+        <a href="#about" class="nav-link">About</a>
+        <a href="#" class="nav-link nav-cta" onclick="openApp({fromLanding:true}); return false;">Open Live Map →</a>
+      </div>
+    </nav>
+
+    <section class="hero" id="top">
+      <div class="hero-bg" aria-hidden="true">
+        <svg viewBox="0 0 800 360" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#fde68a" />
+              <stop offset="0.55" stop-color="#fef3c7" />
+              <stop offset="1" stop-color="#ccfbf1" />
+            </linearGradient>
+            <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#5eead4" />
+              <stop offset="1" stop-color="#0d9488" />
+            </linearGradient>
+            <radialGradient id="sun" cx="0.78" cy="0.18" r="0.18">
+              <stop offset="0" stop-color="#fff7d6" stop-opacity="1" />
+              <stop offset="0.6" stop-color="#fde68a" stop-opacity="0.5" />
+              <stop offset="1" stop-color="#fde68a" stop-opacity="0" />
+            </radialGradient>
+          </defs>
+          <!-- sky -->
+          <rect x="0" y="0" width="800" height="220" fill="url(#sky)" />
+          <!-- sun glow -->
+          <rect x="0" y="0" width="800" height="220" fill="url(#sun)" />
+          <!-- distant hills -->
+          <path d="M0,180 C100,160 200,200 320,175 C440,150 560,195 700,170 C760,160 800,178 800,180 L800,220 L0,220 Z" fill="#a7f3d0" opacity="0.6" />
+          <!-- water -->
+          <rect x="0" y="200" width="800" height="160" fill="url(#water)" />
+          <!-- subtle water ripples -->
+          <g stroke="#ccfbf1" stroke-opacity="0.35" stroke-width="1" fill="none">
+            <path d="M0,235 Q200,225 400,235 T800,235" />
+            <path d="M0,265 Q200,255 400,265 T800,265" />
+            <path d="M0,295 Q200,285 400,295 T800,295" />
+            <path d="M0,325 Q200,315 400,325 T800,325" />
+          </g>
+          <!-- islands (stylized) -->
+          <g fill="#fef3c7" stroke="#d97706" stroke-opacity="0.4" stroke-width="1">
+            <path d="M120,250 Q150,235 200,245 Q235,252 230,275 Q210,295 170,290 Q130,285 120,250 Z" />
+            <path d="M310,235 Q360,220 410,232 Q445,242 430,260 Q400,278 350,272 Q310,265 310,235 Z" />
+            <path d="M540,255 Q580,242 640,250 Q680,256 670,278 Q640,300 590,294 Q540,285 540,255 Z" />
+            <path d="M70,290 Q95,278 130,288 Q155,295 145,308 Q120,320 90,312 Q65,302 70,290 Z" />
+          </g>
+          <!-- boat silhouette -->
+          <g transform="translate(620,275)">
+            <path d="M-22,0 L18,0 L14,7 L-18,7 Z" fill="#0f172a" />
+            <path d="M-3,-22 L-3,0 L-15,0 Z" fill="#fff" stroke="#0f172a" stroke-width="1" />
+          </g>
+          <!-- route line (soft teal) -->
+          <path d="M120,275 Q260,295 420,265 Q540,245 660,270" fill="none" stroke="#0f766e" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 6" opacity="0.7" />
+        </svg>
+      </div>
+      <div class="hero-content">
+        <h1>The living map of Lake Winnipesaukee</h1>
+        <p class="subhead">Live GPS · Community hazards · Local spots · Free to start</p>
+        <div class="cta-row">
+          <button class="btn btn-primary" onclick="openApp({fromLanding:true})">Open Live Map</button>
+          <a href="#how" class="btn btn-secondary">How it works</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="trust-strip" role="list">
+      <span role="listitem">Built for boaters</span>
+      <span class="dot">·</span>
+      <span role="listitem">Works as a PWA</span>
+      <span class="dot">·</span>
+      <span role="listitem">Free core features</span>
+      <span class="dot">·</span>
+      <span role="listitem">Open data</span>
+    </div>
+
+    <section class="section" id="features" aria-labelledby="features-h">
+      <h2 id="features-h">What's on the map</h2>
+      <p class="section-sub">Everything you need on the water, in one calm view.</p>
+      <div class="value-props">
+        <div class="prop">
+          <div class="prop-icon" aria-hidden="true">📍</div>
+          <h3>Real-time position + soft teal route lines</h3>
+          <p>Your live GPS dot, speed, heading, and a calm teal trail that draws behind you as you move.</p>
+        </div>
+        <div class="prop">
+          <div class="prop-icon" aria-hidden="true">⚠️</div>
+          <h3>Tap to mark (and see) hazards</h3>
+          <p>See community-reported rocks, shoals, and seasonal hazards. Drop your own with one tap.</p>
+        </div>
+        <div class="prop">
+          <div class="prop-icon" aria-hidden="true">🍽</div>
+          <h3>Discover marinas, food, and lake stories</h3>
+          <p>Marinas &amp; fuel, restaurants by boat, sandbars, dive sites, and historic landmarks.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="how" aria-labelledby="how-h">
+      <h2 id="how-h">How it works</h2>
+      <p class="section-sub">Open it on your phone, grant GPS, go.</p>
+      <div class="how-grid">
+        <div class="how-step">
+          <h3>Open the map</h3>
+          <p>Works in any browser. For the best feel, add it to your home screen — it's a PWA.</p>
+        </div>
+        <div class="how-step">
+          <h3>Start GPS</h3>
+          <p>One tap grants location permission. Your dot starts updating immediately.</p>
+        </div>
+        <div class="how-step">
+          <h3>Boat</h3>
+          <p>Speed, heading, and a soft teal trail draw behind you as you cruise.</p>
+        </div>
+        <div class="how-step">
+          <h3>Mark spots</h3>
+          <p>Tap + to add buoys, hazards, restaurants, and other points of interest.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="safety" role="note" aria-label="Safety disclaimer">
+      <div class="safety-inner">
+        <span class="ico" aria-hidden="true">⚠️</span>
+        <div>
+          <strong>Not a substitute for official charts or prudent seamanship.</strong>
+          Crowdsourced buoys, channels, and seasonal hazards <strong>may be missing, mislocated, or out of date</strong>.
+          Always confirm visually against official NH Marine Patrol buoys and a printed cruising chart.
+        </div>
+      </div>
+    </div>
+
+    <footer class="landing-footer" id="about" aria-labelledby="about-h">
+      <div class="landing-footer-inner">
+        <div>
+          <h4 id="about-h">About Winni Nav</h4>
+          <p style="margin:0 0 8px;">A living companion for boaters on Lake Winnipesaukee — built with open data, the OpenStreetMap base map, and crowdsourced buoys and hazards from people like you.</p>
+          <p class="small">NH GRANIT bathymetry (reference only), NH Marine Patrol buoy reference (not authoritative — see printed cruising chart), Lake Winnipesaukee marina directory, OpenStreetMap contributors, USGS lake level.</p>
+        </div>
+        <div>
+          <h4>Data &amp; sources</h4>
+          <ul>
+            <li><a href="#" onclick="openInfoModal(); return false;">What's on the map</a></li>
+            <li><a href="https://openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a></li>
+            <li><a href="https://granit.unh.edu" target="_blank" rel="noopener">NH GRANIT</a></li>
+            <li><a href="https://waterdata.usgs.gov/monitoring-location/01080000/" target="_blank" rel="noopener">USGS lake level</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Contact &amp; legal</h4>
+          <ul>
+            <li><a href="#" onclick="openInfoModal(); return false;">About / version</a></li>
+            <li><a href="#" onclick="exportLandingData(); return false;">Export your data</a></li>
+            <li><a href="#privacy" onclick="showPrivacy(); return false;">Privacy</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="copyright">
+        © <span id="footerYear"></span> Winni Nav · Recreation aid only · Always defer to official charts and visual markers.
+      </div>
+    </footer>
+  </div>
+
+  <!-- ================================================================
+       App view (existing map UI, wrapped for view-switching)
+       ================================================================ -->
+  <div id="app">
   <div id="map"></div>
 
   <div id="topbar" class="hud">
     <div id="title">
-      Winni Nav
-      <small>Live GPS · Recreation aid</small>
+      <button id="backToLanding" onclick="showLanding()" title="Back to landing" aria-label="Back to landing">← Home</button>
+      <span id="titleText">Winni Nav <small>Live GPS · Recreation aid</small></span>
     </div>
     <button id="startBtn">Start GPS</button>
   </div>
@@ -792,23 +1683,43 @@
       <span class="chevron">▼</span>
     </div>
     <div id="layers-body">
-      <label class="layer-toggle"><input type="checkbox" id="layerBuoys" /> Buoys</label>
-      <label class="layer-toggle" title="Shipped recommendations (teal) + your finger-drawn routes (blue dashed)"><input type="checkbox" id="layerRoutes" /> Routes</label>
-      <label class="layer-toggle"><input type="checkbox" id="layerLaunches" /> Launches</label>
-      <label class="layer-toggle"><input type="checkbox" id="layerMarinas" /> Marinas &amp; fuel</label>
-      <label class="layer-toggle"><input type="checkbox" id="layerBridges" /> Bridges &amp; clearance <small>(off by default)</small></label>
-      <label class="layer-toggle"><input type="checkbox" id="layerHazards" /> Hazards</label>
-      <label class="layer-toggle"><input type="checkbox" id="layerTrips" /> Trips</label>
-      <label class="layer-toggle"><input type="checkbox" id="layerPois" /> POIs</label>
-      <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisRestaurants" /> 🍽 Restaurants</label>
-      <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisHotels" /> 🏨 Hotels</label>
-      <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisGroceries" /> 🛒 Groceries</label>
-      <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisHistorical" /> 🏛 Historic</label>
-      <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisDive" /> 🤿 Dive sites</label>
-      <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisSandbar" /> 🏖 Sandbars</label>
-      <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisBeach" /> ⛱ Beaches</label>
-      <label class="layer-toggle"><input type="checkbox" id="layerDepths" /> Depth soundings (yours)</label>
-      <label class="layer-toggle"><input type="checkbox" id="layerBathy" /> NH Bathymetry <small>(ref.)</small></label>
+      <div class="layer-section">
+        <div class="layer-section-title">🧭 Navigation</div>
+        <label class="layer-toggle"><input type="checkbox" id="layerBuoys" /> Buoys <small style="opacity:0.6">(community)</small></label>
+        <label class="layer-toggle" title="Shipped recommendations (orange) + your finger-drawn routes (teal dashed)"><input type="checkbox" id="layerRoutes" /> Routes</label>
+        <label class="layer-toggle"><input type="checkbox" id="layerHazards" /> Hazards <small style="opacity:0.6">(community)</small></label>
+        <label class="layer-toggle"><input type="checkbox" id="layerBridges" /> Bridges &amp; clearance <small style="opacity:0.6">(off by default)</small></label>
+      </div>
+
+      <div class="layer-section">
+        <div class="layer-section-title">⛵ Boating</div>
+        <label class="layer-toggle"><input type="checkbox" id="layerLaunches" /> Public launches</label>
+        <label class="layer-toggle"><input type="checkbox" id="layerMarinas" /> Marinas &amp; fuel</label>
+        <label class="layer-toggle"><input type="checkbox" id="layerTrips" /> My trips</label>
+      </div>
+
+      <div class="layer-section">
+        <div class="layer-section-title">🍽 Local &amp; stories</div>
+        <label class="layer-toggle"><input type="checkbox" id="layerPois" /> POIs</label>
+        <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisRestaurants" /> 🍽 Restaurants</label>
+        <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisHotels" /> 🏨 Hotels</label>
+        <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisGroceries" /> 🛒 Groceries</label>
+        <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisSandbar" /> 🏖 Sandbars</label>
+        <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisBeach" /> ⛱ Beaches</label>
+        <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisHistorical" /> 🏛 Historic</label>
+        <label class="layer-toggle layer-toggle-sub" style="padding-left:22px;font-size:11px;"><input type="checkbox" id="layerPoisDive" /> 🤿 Dive sites</label>
+      </div>
+
+      <div class="layer-section">
+        <div class="layer-section-title">🗺 Reference</div>
+        <label class="layer-toggle"><input type="checkbox" id="layerDepths" /> Depth soundings <small style="opacity:0.6">(yours)</small></label>
+        <label class="layer-toggle"><input type="checkbox" id="layerBathy" /> NH Bathymetry <small style="opacity:0.6">(ref. only)</small></label>
+      </div>
+
+      <div class="layer-section" id="sponsoredSlots" style="display:none;">
+        <div class="layer-section-title" style="color:var(--gold-300);">⭐ Featured</div>
+        <!-- Phase 2: sponsored / premium pins render here -->
+      </div>
     </div>
   </div>
 
@@ -833,7 +1744,17 @@
     </div>
   </div>
 
-  <div id="actions" class="hud">
+  <!-- Search bar + results overlay (top center) -->
+  <div id="searchBar" class="hud" role="search" aria-label="Search places on the lake">
+    <span class="search-ico" aria-hidden="true">🔍</span>
+    <input id="searchInput" type="search" placeholder="Search places, marinas, restaurants…" autocomplete="off" enterkeyhint="search" />
+    <button class="search-clear" id="searchClear" aria-label="Clear search" style="display:none;">×</button>
+  </div>
+  <div id="searchResults" class="hud" role="listbox" aria-label="Search results"></div>
+
+  <!-- Legacy icon row kept for backwards compat; CSS hides it.
+       The new #actionSheet below replaces it. -->
+  <div id="actions" class="hud" aria-hidden="true">
     <button class="icon-btn" id="vesselIconBtn" title="Change vessel icon" onclick="showVesselPickerModal()">🚤</button>
     <button class="icon-btn" id="recenterBtn" title="Recenter on me">⊙</button>
     <button class="icon-btn" id="buoyModeBtn" title="Add buoy mode">📍</button>
@@ -845,6 +1766,34 @@
     <button class="icon-btn" id="infoBtn" title="Info">ⓘ</button>
   </div>
 
+  <!-- New bottom action sheet — primary actions visible, overflow for the rest -->
+  <div id="actionSheet" class="hud" role="toolbar" aria-label="Map actions">
+    <button class="fab" id="fabMark" title="Mark a spot — buoy, hazard, POI" aria-label="Mark a spot" onclick="enterBuoyMode()">📍</button>
+    <button class="fab secondary" id="fabRecenter" title="Recenter on me" aria-label="Recenter on me" onclick="recenterOnUser()">⊙</button>
+    <button class="fab secondary" id="fabTrip" title="Record trip" aria-label="Record trip" disabled>⏺</button>
+    <button class="fab secondary" id="fabTrips" title="My trips" aria-label="My trips">🛶</button>
+    <button class="fab secondary" id="fabMore" title="More actions" aria-label="More actions" aria-haspopup="true" aria-expanded="false">⋯</button>
+    <div id="moreMenu" role="menu" style="display:none;">
+      <button class="action-chip" id="moreVessel" role="menuitem"><span class="ico" aria-hidden="true">🚤</span><span>Vessel</span></button>
+      <button class="action-chip" id="moreRoute" role="menuitem"><span class="ico" aria-hidden="true">✏️</span><span>Draw route</span></button>
+      <button class="action-chip" id="moreExport" role="menuitem"><span class="ico" aria-hidden="true">💾</span><span>Export data</span></button>
+      <button class="action-chip" id="moreRescue" role="menuitem"><span class="ico" aria-hidden="true">🆘</span><span>Where am I</span></button>
+      <button class="action-chip" id="moreInfo" role="menuitem"><span class="ico" aria-hidden="true">ⓘ</span><span>About / version</span></button>
+      <button class="action-chip" id="moreHome" role="menuitem"><span class="ico" aria-hidden="true">←</span><span>Back to landing</span></button>
+    </div>
+  </div>
+
+  <!-- PWA install banner -->
+  <div id="pwaInstall" class="hud" role="dialog" aria-label="Install Winni Nav">
+    <span aria-hidden="true">📲</span>
+    <span>Add Winni Nav to your home screen</span>
+    <button id="pwaInstallBtn">Install</button>
+    <button id="pwaInstallDismiss" class="dismiss" aria-label="Dismiss">×</button>
+  </div>
+
+  <!-- App-view footer link (back to landing) -->
+  <a href="#" class="app-foot-link" id="appFootLink" onclick="showLanding(); return false;">About / data sources</a>
+
   <!-- Buoy add modal -->
   <div id="modal">
     <div class="card">
@@ -853,6 +1802,8 @@
       <div class="row" id="modalActions"></div>
     </div>
   </div>
+
+  </div><!-- /#app -->
 
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -4810,8 +5761,387 @@ ${tracks}
       document.getElementById('rescueBtn').addEventListener('click', showRescueModal);
     }
 
-    // ----- Boot -----
+    // ====================================================================
+    // View switching: landing ↔ app
+    // ====================================================================
+    // First-time visitors see the landing page; returning visitors go
+    // straight to the app. Persisted in localStorage so a tap on the
+    // landing CTA doesn't bounce back on the next reload.
+    const VIEW_KEY = 'winniView';
+
+    function showLanding() {
+      document.body.classList.add('landing-open');
+      document.body.classList.remove('app-view');
+      try { localStorage.setItem(VIEW_KEY, 'landing'); } catch (e) {}
+      // Close the more-menu in case it was open
+      const mm = document.getElementById('moreMenu');
+      if (mm) mm.style.display = 'none';
+      const moreBtn = document.getElementById('fabMore');
+      if (moreBtn) moreBtn.setAttribute('aria-expanded', 'false');
+      // Hide the search results panel
+      const sr = document.getElementById('searchResults');
+      if (sr) sr.classList.remove('show');
+      window.scrollTo(0, 0);
+    }
+
+    function openApp(opts) {
+      opts = opts || {};
+      document.body.classList.remove('landing-open');
+      document.body.classList.add('app-view');
+      try { localStorage.setItem(VIEW_KEY, 'app'); } catch (e) {}
+      // Map needs an invalidateSize after the container becomes visible,
+      // otherwise it can render blank until the next resize event.
+      try {
+        if (typeof map !== 'undefined' && map && map.invalidateSize) {
+          setTimeout(() => map.invalidateSize(), 50);
+        }
+      } catch (e) {}
+      if (opts.fromLanding) {
+        // Fresh entry — invalidate again after the CSS transition settles.
+        setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 300);
+      }
+    }
+
+    function recenterOnUser() {
+      if (typeof userMarker !== 'undefined' && userMarker) {
+        map.setView(userMarker.getLatLng(), 15, { animate: true });
+      } else if (typeof lastPos !== 'undefined' && lastPos) {
+        map.setView([lastPos.lat, lastPos.lng], 15, { animate: true });
+      } else {
+        // No GPS yet — just recenter on the lake
+        map.setView(WINNI_CENTER, 12, { animate: true });
+      }
+    }
+
+    // ====================================================================
+    // Search — searches across LAUNCHES, MARINAS, POIs (when seeded)
+    // ====================================================================
+    let searchIndex = null;
+
+    function buildSearchIndex() {
+      const items = [];
+      // Launches
+      if (typeof LAUNCHES !== 'undefined') {
+        LAUNCHES.forEach(l => items.push({
+          kind: 'launch',
+          label: l.name,
+          meta: l.note || '',
+          lat: l.lat, lng: l.lng,
+          icon: '⛵',
+        }));
+      }
+      // Marinas
+      if (typeof MARINAS !== 'undefined') {
+        MARINAS.forEach(m => items.push({
+          kind: 'marina',
+          label: m.name,
+          meta: (m.town || '') + (m.season ? ' · ' + m.season : ''),
+          lat: m.lat, lng: m.lng,
+          icon: '⚓',
+        }));
+      }
+      // POIs (seeded + user-added, once storedPois is loaded)
+      if (typeof storedPois !== 'undefined' && Array.isArray(storedPois)) {
+        storedPois.forEach(p => {
+          const cat = (p.cat || 'poi');
+          const icoMap = {
+            restaurant: '🍽', hotel: '🏨', grocery: '🛒', historical: '🏛',
+            dive: '🤿', sandbar: '🏖', beach: '⛱',
+          };
+          items.push({
+            kind: 'poi:' + cat,
+            label: p.name,
+            meta: (p.note || cat).slice(0, 60),
+            lat: p.lat, lng: p.lng,
+            icon: icoMap[cat] || '📍',
+          });
+        });
+      }
+      // Hazards + buoys (community)
+      if (typeof storedBuoys !== 'undefined' && Array.isArray(storedBuoys)) {
+        storedBuoys.forEach(b => items.push({
+          kind: 'buoy',
+          label: 'Buoy · ' + (b.color || 'unknown'),
+          meta: b.note || '',
+          lat: b.lat, lng: b.lng,
+          icon: '⚓',
+        }));
+      }
+      if (typeof storedHazards !== 'undefined' && Array.isArray(storedHazards)) {
+        storedHazards.forEach(h => items.push({
+          kind: 'hazard',
+          label: 'Hazard · ' + (h.kind || 'unknown'),
+          meta: h.note || '',
+          lat: h.lat, lng: h.lng,
+          icon: '⚠️',
+        }));
+      }
+      searchIndex = items;
+    }
+
+    function setupSearch() {
+      const input = document.getElementById('searchInput');
+      const clear = document.getElementById('searchClear');
+      const panel = document.getElementById('searchResults');
+      if (!input || !panel) return;
+
+      function show(q) {
+        if (!searchIndex) buildSearchIndex();
+        const query = q.trim().toLowerCase();
+        clear.style.display = q ? 'inline-block' : 'none';
+        if (!query) { panel.classList.remove('show'); return; }
+        const matches = searchIndex
+          .filter(it => (it.label || '').toLowerCase().includes(query)
+                     || (it.meta || '').toLowerCase().includes(query))
+          .slice(0, 12);
+        if (matches.length === 0) {
+          panel.innerHTML = '<div class="search-empty">No matches on the map yet.</div>';
+        } else {
+          panel.innerHTML = matches.map((m, i) =>
+            `<div class="search-result" data-i="${i}">
+               <span class="ico" aria-hidden="true">${m.icon}</span>
+               <div style="flex:1;min-width:0;">
+                 <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(m.label)}</div>
+                 <div class="meta">${escapeHtml(m.meta || m.kind)}</div>
+               </div>
+             </div>`
+          ).join('');
+        }
+        panel.classList.add('show');
+        // Bind click handlers
+        panel.querySelectorAll('.search-result').forEach((el, i) => {
+          el.addEventListener('click', () => {
+            const m = matches[i];
+            if (m && typeof map !== 'undefined' && map) {
+              map.setView([m.lat, m.lng], 15, { animate: true });
+            }
+            panel.classList.remove('show');
+            input.value = '';
+            clear.style.display = 'none';
+            input.blur();
+          });
+        });
+      }
+
+      input.addEventListener('input', e => show(e.target.value));
+      input.addEventListener('focus', e => { if (e.target.value) show(e.target.value); });
+      clear.addEventListener('click', () => {
+        input.value = '';
+        clear.style.display = 'none';
+        panel.classList.remove('show');
+        input.focus();
+      });
+      // Close on Escape
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && panel.classList.contains('show')) {
+          panel.classList.remove('show');
+          input.blur();
+        }
+      });
+      // Outside-tap closes
+      document.addEventListener('click', e => {
+        if (!panel.classList.contains('show')) return;
+        if (panel.contains(e.target)) return;
+        if (e.target === input || e.target === clear) return;
+        panel.classList.remove('show');
+      });
+    }
+
+    // ====================================================================
+    // Action sheet (new FAB bar) + more menu
+    // ====================================================================
+    function setupActionSheet() {
+      const fabTrip  = document.getElementById('fabTrip');
+      const fabTrips = document.getElementById('fabTrips');
+      const fabMore  = document.getElementById('fabMore');
+      const moreMenu = document.getElementById('moreMenu');
+      const startBtn = document.getElementById('startBtn');
+      if (!fabTrip || !fabMore) return;
+
+      // Mirror the legacy ⏺ button state to the new FAB so both work.
+      function syncFabTrip() {
+        const btn = document.getElementById('tripRecBtn');
+        if (!btn || !fabTrip) return;
+        const gpsOn = (typeof watchId !== 'undefined' && watchId !== null);
+        const recording = (typeof currentTrip !== 'undefined' && currentTrip);
+        fabTrip.disabled = !gpsOn;
+        fabTrip.classList.toggle('recording', recording);
+        fabTrip.textContent = recording ? '⏹' : '⏺';
+      }
+      // Expose for the legacy update path
+      window.syncFabTrip = syncFabTrip;
+
+      fabTrip.addEventListener('click', () => {
+        if (typeof currentTrip !== 'undefined' && currentTrip) stopTripRecording();
+        else startTripRecording();
+      });
+      fabTrips.addEventListener('click', () => {
+        if (typeof showTripsModal === 'function') showTripsModal();
+      });
+
+      // More menu toggle
+      function toggleMore(force) {
+        const show = (force !== undefined) ? force : (moreMenu.style.display === 'none');
+        moreMenu.style.display = show ? 'flex' : 'none';
+        fabMore.setAttribute('aria-expanded', show ? 'true' : 'false');
+      }
+      fabMore.addEventListener('click', e => {
+        e.stopPropagation();
+        toggleMore();
+      });
+      document.addEventListener('click', e => {
+        if (moreMenu.style.display === 'none') return;
+        if (moreMenu.contains(e.target) || e.target === fabMore) return;
+        toggleMore(false);
+      });
+      // Bind more-menu items
+      document.getElementById('moreVessel').addEventListener('click', () => { toggleMore(false); showVesselPickerModal(); });
+      document.getElementById('moreRoute').addEventListener('click', () => { toggleMore(false); if (typeof routeDrawMode !== 'undefined' && routeDrawMode) exitRouteDrawMode(); else enterRouteDrawMode(); });
+      document.getElementById('moreExport').addEventListener('click', () => { toggleMore(false); document.getElementById('exportBtn').click(); });
+      document.getElementById('moreRescue').addEventListener('click', () => { toggleMore(false); showRescueModal(); });
+      document.getElementById('moreInfo').addEventListener('click', () => { toggleMore(false); openInfoModal(); });
+      document.getElementById('moreHome').addEventListener('click', () => { toggleMore(false); showLanding(); });
+    }
+
+    // ====================================================================
+    // Info modal — same content as legacy #infoBtn, but exposed globally
+    // so the landing page footer can link to it.
+    // ====================================================================
+    function openInfoModal() {
+      if (typeof document.getElementById('modal') === 'undefined') return;
+      const modal = document.getElementById('modal');
+      const body = document.getElementById('modalBody');
+      const actions = document.getElementById('modalActions');
+      const title = document.getElementById('modalTitle');
+      title.textContent = 'Winni Nav';
+      body.innerHTML = `
+        <p><strong>Recreation aid — not for primary navigation.</strong></p>
+        <p>Always defer to official charts, visual markers, and NH Marine Patrol buoys.</p>
+        <p style="font-size:12px;color:#666;">
+          Layers: buoys (community-contributed), hazards (community-contributed), public launches, marinas &amp; fuel docks, bridges &amp; clearance (off by default — verify before transit), past trips, POIs (restaurants / hotels / groceries / historic / dive sites / sandbars / beaches, directory-seeded + community), crowdsourced depth soundings, and NH GRANIT bathymetry (reference only).<br>
+          Data sources: Roche Realty launch list, NH GRANIT/NHDES bathymetry, Lake Winnipesaukee marina directory (reference), Lake Winnipesaukee POI directory (2014–2016), OpenStreetMap base map.<br>
+          Tap 📍 then tap the map to add a buoy, hazard, POI, or depth sounding — pick which in the popup.<br>
+          Tap a ⚓ marina marker for hours, services, “Route to here”, and (when added) a phone link.<br>
+          Tap 🆘 to see your exact lat/lng, nearest launch, nearest marina, and one-tap links to 911 / NH Marine Patrol / share-my-location.<br>
+          Tap 🛶 to view, rename, export (GPX), or delete past trips.<br>
+          Tap the 🚤 boat icon to pick your vessel — the icon shown at your GPS location. 9 options from speedboat to mermaid. Your choice is saved locally and applied immediately.<br>
+          Trips auto-record while GPS is on and auto-save when you stop.<br>
+          Tap a shipped (orange) route line for label, distance, GPX export, and "Route to start" in Google Maps.
+        </p>
+        <p style="font-size:12px;color:#666;">
+          <strong>Buoys saved locally:</strong> ${typeof storedBuoys !== 'undefined' ? storedBuoys.length : 0}<br>
+          <strong>Hazards saved locally:</strong> ${typeof storedHazards !== 'undefined' ? storedHazards.length : 0}<br>
+          <strong>Trips saved locally:</strong> ${typeof storedTrips !== 'undefined' ? storedTrips.length : 0}<br>
+          <strong>POIs saved locally:</strong> ${typeof storedPois !== 'undefined' ? storedPois.length : 0}<br>
+          <strong>Depth soundings saved locally:</strong> ${typeof storedDepths !== 'undefined' ? storedDepths.length : 0}<br>
+          <strong>Your finger-drawn routes:</strong> ${typeof storedRoutes !== 'undefined' ? storedRoutes.length : 0}<br>
+          <strong>Shipped recommended routes:</strong> ${(typeof getCachedShippedRoutes === 'function' ? (getCachedShippedRoutes() || []) : []).length} (cached locally).<br>
+          <strong>Marinas in directory:</strong> ${typeof MARINAS !== 'undefined' ? MARINAS.length : 0} (static reference data).<br>
+          <strong>Bridges &amp; clearance:</strong> ${typeof BRIDGES !== 'undefined' ? BRIDGES.length : 0} (off by default).<br>
+          Use 💾 to export your data as JSON, or 🛶 to export trips as GPX.
+        </p>
+        <p style="font-size:12px;color:#666;margin-top:12px;">
+          <a href="#" onclick="resetSafetyDisclaimer(); cancelModal(); return false;">🔄 Re-show safety disclaimer</a>
+        </p>
+      `;
+      actions.innerHTML = `<button class="btn btn-primary" onclick="cancelModal()">Close</button>`;
+      modal.classList.add('show');
+    }
+    function exportLandingData() { openApp({fromLanding:true}); setTimeout(() => document.getElementById('exportBtn').click(), 200); }
+    function showPrivacy() {
+      const modal = document.getElementById('modal');
+      const body = document.getElementById('modalBody');
+      const actions = document.getElementById('modalActions');
+      const title = document.getElementById('modalTitle');
+      title.textContent = 'Privacy';
+      body.innerHTML = `
+        <p><strong>Winni Nav is local-first.</strong></p>
+        <p style="font-size:14px;line-height:1.5;">All your crowdsourced data — buoys, hazards, trips, depth soundings, POIs, and finger-drawn routes — is stored only in your browser's localStorage on this device. Nothing is uploaded to any server.</p>
+        <p style="font-size:14px;line-height:1.5;">Location data is read by your browser's Geolocation API to draw your GPS dot and trip trail; it is never transmitted off your device.</p>
+        <p style="font-size:14px;line-height:1.5;">The app does load third-party map tiles from OpenStreetMap and (optionally) NH GRANIT bathymetry from nhgeodata.unh.edu when you turn those layers on. Those requests go directly from your browser to those providers under their respective privacy policies.</p>
+        <p style="font-size:12px;color:#666;">You can wipe your local data anytime with 💾 Export (delete the resulting JSON) or by clearing site data in your browser settings.</p>
+      `;
+      actions.innerHTML = `<button class="btn btn-primary" onclick="cancelModal()">Close</button>`;
+      modal.classList.add('show');
+    }
+
+    // ====================================================================
+    // PWA install prompt
+    // ====================================================================
+    let pwaInstallEvent = null;
+    function setupPwaInstall() {
+      const banner = document.getElementById('pwaInstall');
+      const installBtn = document.getElementById('pwaInstallBtn');
+      const dismissBtn = document.getElementById('pwaInstallDismiss');
+      if (!banner) return;
+
+      window.addEventListener('beforeinstallprompt', e => {
+        // Stash the event for the Install button to fire later.
+        e.preventDefault();
+        pwaInstallEvent = e;
+        try {
+          if (localStorage.getItem('winniPwaDismissed') === '1') return;
+        } catch (err) {}
+        banner.classList.add('show');
+      });
+
+      if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+          if (!pwaInstallEvent) return;
+          banner.classList.remove('show');
+          pwaInstallEvent.prompt();
+          try { await pwaInstallEvent.userChoice; } catch (err) {}
+          pwaInstallEvent = null;
+        });
+      }
+      if (dismissBtn) {
+        dismissBtn.addEventListener('click', () => {
+          banner.classList.remove('show');
+          try { localStorage.setItem('winniPwaDismissed', '1'); } catch (err) {}
+        });
+      }
+    }
+
+    function registerServiceWorker() {
+      if (!('serviceWorker' in navigator)) return;
+      // Register relative to the page so it works at / and any subpath
+      const swUrl = new URL('sw.js', location.href).toString();
+      navigator.serviceWorker.register(swUrl).catch(err => {
+        console.warn('SW registration failed:', err);
+      });
+    }
+
+    // ====================================================================
+    // Footer year auto-update
+    // ====================================================================
+    function updateFooterYear() {
+      const el = document.getElementById('footerYear');
+      if (el) el.textContent = new Date().getFullYear();
+    }
+
+    // ====================================================================
+    // Decide initial view on first paint
+    // ====================================================================
+    function pickInitialView() {
+      let view = 'landing';
+      try {
+        const saved = localStorage.getItem(VIEW_KEY);
+        if (saved === 'app') view = 'app';
+      } catch (e) {}
+      if (view === 'app') openApp();
+      else showLanding();
+    }
+
+    // ====================================================================
+    // Boot
+    // ====================================================================
     document.addEventListener('DOMContentLoaded', () => {
+      // Always render the footer year regardless of view
+      updateFooterYear();
+      // Pick view BEFORE the map boots so we don't pay the Leaflet init cost
+      // for a page the user is going to bounce off of.
+      pickInitialView();
+
       initMap();
       wireUI();
       // Best-effort lake-level fetch on boot. Silent if it fails (the bridge
@@ -4833,6 +6163,16 @@ ${tracks}
       // Sync the persistent vessel icon button to the user's saved choice.
       const vesselBtn = document.getElementById('vesselIconBtn');
       if (vesselBtn) vesselBtn.textContent = getCurrentVessel().emoji;
+
+      // New UI wiring
+      buildSearchIndex();
+      setupSearch();
+      setupActionSheet();
+      setupPwaInstall();
+      registerServiceWorker();
+
+      // Mirror trip-rec button state to the new FAB after init
+      if (typeof window.syncFabTrip === 'function') window.syncFabTrip();
     });
   </script>
 </body>
