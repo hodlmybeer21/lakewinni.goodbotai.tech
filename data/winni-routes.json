@@ -1,7 +1,7 @@
 {
   "version": 1,
   "format": "winni-shipped-routes-v1",
-  "updated": "2026-08-22T20:57:49Z",
+  "updated": "2026-08-22T21:05:00Z",
   "note": "Shipped recommended routes. Shipped with the app — not editable by users. User finger-drawn routes live separately in localStorage.winniRoutes.",
   "routes": [
     {
@@ -3564,7 +3564,98 @@
       "added": "2026-08-22T20:57:22.103Z",
       "pointCount": 31,
       "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
+    },
+    {
+      "id": "r1787432667467mr902",
+      "section": "37",
+      "label": "Along Whortleberry Island (south-central west shore)",
+      "short_label": "Whortleberry",
+      "points": [
+        {
+          "lat": 43.647830005740346,
+          "lng": -71.30011081695558
+        },
+        {
+          "lat": 43.64796974573396,
+          "lng": -71.30129098892213
+        },
+        {
+          "lat": 43.648575281949604,
+          "lng": -71.30337238311769
+        },
+        {
+          "lat": 43.64932054891162,
+          "lng": -71.30446672439577
+        },
+        {
+          "lat": 43.65029869776585,
+          "lng": -71.30515336990358
+        },
+        {
+          "lat": 43.651571820032956,
+          "lng": -71.30588293075563
+        },
+        {
+          "lat": 43.652612034046726,
+          "lng": -71.30691289901735
+        },
+        {
+          "lat": 43.65303121967545,
+          "lng": -71.30792140960695
+        },
+        {
+          "lat": 43.65404035826251,
+          "lng": -71.30927324295045
+        },
+        {
+          "lat": 43.65537550017898,
+          "lng": -71.31036758422853
+        },
+        {
+          "lat": 43.65624487895722,
+          "lng": -71.31186962127687
+        },
+        {
+          "lat": 43.65683480738844,
+          "lng": -71.31339311599733
+        },
+        {
+          "lat": 43.65745577842322,
+          "lng": -71.31513118743898
+        },
+        {
+          "lat": 43.658030170913015,
+          "lng": -71.31684780120851
+        },
+        {
+          "lat": 43.6583096031105,
+          "lng": -71.31774902343751
+        },
+        {
+          "lat": 43.65841827083612,
+          "lng": -71.31839275360109
+        },
+        {
+          "lat": 43.658495890519724,
+          "lng": -71.31937980651857
+        },
+        {
+          "lat": 43.65869770122747,
+          "lng": -71.32004499435426
+        },
+        {
+          "lat": 43.65902370170714,
+          "lng": -71.32066726684572
+        },
+        {
+          "lat": 43.659287605560934,
+          "lng": -71.32122516632081
+        }
+      ],
+      "added": "2026-08-22T21:04:27.467Z",
+      "pointCount": 20,
+      "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
     }
   ],
-  "routes_count": 36
+  "routes_count": 37
 }
