@@ -1,7 +1,7 @@
 {
   "version": 1,
   "format": "winni-shipped-routes-v1",
-  "updated": "2026-08-22T20:42:12Z",
+  "updated": "2026-08-22T20:46:39Z",
   "note": "Shipped recommended routes. Shipped with the app — not editable by users. User finger-drawn routes live separately in localStorage.winniRoutes.",
   "routes": [
     {
@@ -3354,7 +3354,82 @@
       "added": "2026-08-22T20:41:45.070Z",
       "pointCount": 14,
       "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
+    },
+    {
+      "id": "r1787431557901omj40",
+      "section": "35",
+      "label": "Wawbeek shoreline (south of Governor's Island)",
+      "short_label": "Wawbeek",
+      "points": [
+        {
+          "lat": 43.67203122863183,
+          "lng": -71.29826545715333
+        },
+        {
+          "lat": 43.67198466733349,
+          "lng": -71.29890918731691
+        },
+        {
+          "lat": 43.67201570820308,
+          "lng": -71.299467086792
+        },
+        {
+          "lat": 43.67203122863183,
+          "lng": -71.30015373229982
+        },
+        {
+          "lat": 43.67161217564605,
+          "lng": -71.30073308944704
+        },
+        {
+          "lat": 43.6705722907829,
+          "lng": -71.3012480735779
+        },
+        {
+          "lat": 43.66967207739649,
+          "lng": -71.30135536193849
+        },
+        {
+          "lat": 43.668694244109616,
+          "lng": -71.30131244659425
+        },
+        {
+          "lat": 43.667933696095155,
+          "lng": -71.30120515823366
+        },
+        {
+          "lat": 43.66745252808862,
+          "lng": -71.30165576934816
+        },
+        {
+          "lat": 43.667080008273246,
+          "lng": -71.3031578063965
+        },
+        {
+          "lat": 43.66670748614599,
+          "lng": -71.3046169281006
+        },
+        {
+          "lat": 43.666490180504134,
+          "lng": -71.30622625350954
+        },
+        {
+          "lat": 43.666397049273954,
+          "lng": -71.30807161331178
+        },
+        {
+          "lat": 43.66642809303339,
+          "lng": -71.30980968475343
+        },
+        {
+          "lat": 43.66652122421543,
+          "lng": -71.31148338317873
+        }
+      ],
+      "added": "2026-08-22T20:45:57.901Z",
+      "pointCount": 16,
+      "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
     }
   ],
-  "routes_count": 34
+  "routes_count": 35
 }
