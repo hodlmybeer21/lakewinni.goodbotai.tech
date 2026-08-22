@@ -1,7 +1,7 @@
 {
   "version": 1,
   "format": "winni-shipped-routes-v1",
-  "updated": "2026-08-22T21:14:40Z",
+  "updated": "2026-08-22T21:16:37Z",
   "note": "Shipped recommended routes. Shipped with the app — not editable by users. User finger-drawn routes live separately in localStorage.winniRoutes.",
   "routes": [
     {
@@ -3766,7 +3766,58 @@
       "added": "2026-08-22T21:14:14.826Z",
       "pointCount": 25,
       "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
+    },
+    {
+      "id": "r1787433367223wzqyl",
+      "section": "39",
+      "label": "Along Pistol Island (south-central west shore)",
+      "short_label": "Pistol",
+      "points": [
+        {
+          "lat": 43.660676962604015,
+          "lng": -71.3097131252289
+        },
+        {
+          "lat": 43.66004050135695,
+          "lng": -71.30980968475343
+        },
+        {
+          "lat": 43.65910908249267,
+          "lng": -71.30979895591737
+        },
+        {
+          "lat": 43.658565748149165,
+          "lng": -71.3092088699341
+        },
+        {
+          "lat": 43.658115553111344,
+          "lng": -71.30869388580324
+        },
+        {
+          "lat": 43.6577274512316,
+          "lng": -71.30844712257387
+        },
+        {
+          "lat": 43.657354871067064,
+          "lng": -71.30869388580324
+        },
+        {
+          "lat": 43.65683480738844,
+          "lng": -71.30924105644227
+        },
+        {
+          "lat": 43.65605082228543,
+          "lng": -71.30984187126161
+        },
+        {
+          "lat": 43.65537550017898,
+          "lng": -71.31031394004823
+        }
+      ],
+      "added": "2026-08-22T21:16:07.223Z",
+      "pointCount": 10,
+      "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
     }
   ],
-  "routes_count": 38
+  "routes_count": 39
 }
