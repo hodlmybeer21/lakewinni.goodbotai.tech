@@ -1,7 +1,7 @@
 {
   "version": 1,
   "format": "winni-shipped-routes-v1",
-  "updated": "2026-08-22T21:05:00Z",
+  "updated": "2026-08-22T21:14:40Z",
   "note": "Shipped recommended routes. Shipped with the app — not editable by users. User finger-drawn routes live separately in localStorage.winniRoutes.",
   "routes": [
     {
@@ -3655,7 +3655,118 @@
       "added": "2026-08-22T21:04:27.467Z",
       "pointCount": 20,
       "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
+    },
+    {
+      "id": "r1787433254826jpgnd",
+      "section": "38",
+      "label": "Along Dow Island (south-central west shore)",
+      "short_label": "Dow Island",
+      "points": [
+        {
+          "lat": 43.657471302616806,
+          "lng": -71.31523847579957
+        },
+        {
+          "lat": 43.657471302616806,
+          "lng": -71.3157641887665
+        },
+        {
+          "lat": 43.65733934684337,
+          "lng": -71.31634354591371
+        },
+        {
+          "lat": 43.65703662367913,
+          "lng": -71.3167726993561
+        },
+        {
+          "lat": 43.656563130541365,
+          "lng": -71.31705164909364
+        },
+        {
+          "lat": 43.65606634684224,
+          "lng": -71.31693363189699
+        },
+        {
+          "lat": 43.6556704693895,
+          "lng": -71.31683707237245
+        },
+        {
+          "lat": 43.6552668269467,
+          "lng": -71.31678342819215
+        },
+        {
+          "lat": 43.65497961817182,
+          "lng": -71.31685853004457
+        },
+        {
+          "lat": 43.654770032523224,
+          "lng": -71.31709456443788
+        },
+        {
+          "lat": 43.65457597108528,
+          "lng": -71.31729841232301
+        },
+        {
+          "lat": 43.654459533921475,
+          "lng": -71.31757736206056
+        },
+        {
+          "lat": 43.65437414652454,
+          "lng": -71.31795287132265
+        },
+        {
+          "lat": 43.654079170946424,
+          "lng": -71.31825327873231
+        },
+        {
+          "lat": 43.65371433072711,
+          "lng": -71.3185751438141
+        },
+        {
+          "lat": 43.653178710219315,
+          "lng": -71.31943345069887
+        },
+        {
+          "lat": 43.65256545768515,
+          "lng": -71.32039904594423
+        },
+        {
+          "lat": 43.652006538528646,
+          "lng": -71.32148265838624
+        },
+        {
+          "lat": 43.65167273710706,
+          "lng": -71.32233023643495
+        },
+        {
+          "lat": 43.65154853145333,
+          "lng": -71.32285594940187
+        },
+        {
+          "lat": 43.65154076859144,
+          "lng": -71.32368206977846
+        },
+        {
+          "lat": 43.65160287145843,
+          "lng": -71.3246262073517
+        },
+        {
+          "lat": 43.6517270769998,
+          "lng": -71.32550597190858
+        },
+        {
+          "lat": 43.65194443607904,
+          "lng": -71.32660031318666
+        },
+        {
+          "lat": 43.65210745487224,
+          "lng": -71.32727622985841
+        }
+      ],
+      "added": "2026-08-22T21:14:14.826Z",
+      "pointCount": 25,
+      "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
     }
   ],
-  "routes_count": 37
+  "routes_count": 38
 }
