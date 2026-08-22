@@ -1,7 +1,7 @@
 {
   "version": 1,
   "format": "winni-shipped-routes-v1",
-  "updated": "2026-08-22T21:43:36Z",
+  "updated": "2026-08-22T21:46:27Z",
   "note": "Shipped recommended routes. Shipped with the app — not editable by users. User finger-drawn routes live separately in localStorage.winniRoutes.",
   "routes": [
     {
@@ -3880,7 +3880,58 @@
       "added": "2026-08-22T21:42:56.474Z",
       "pointCount": 13,
       "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
+    },
+    {
+      "id": "r1787435162973bzchs",
+      "section": "41",
+      "label": "Along Barndoor Island (Wolfeboro area)",
+      "short_label": "Barndoor",
+      "points": [
+        {
+          "lat": 43.552109487989384,
+          "lng": -71.20998859405519
+        },
+        {
+          "lat": 43.55240496396931,
+          "lng": -71.21140480041505
+        },
+        {
+          "lat": 43.552653784723546,
+          "lng": -71.2127995491028
+        },
+        {
+          "lat": 43.55341579189283,
+          "lng": -71.21402263641359
+        },
+        {
+          "lat": 43.55423999288211,
+          "lng": -71.21531009674074
+        },
+        {
+          "lat": 43.555655104137166,
+          "lng": -71.2170696258545
+        },
+        {
+          "lat": 43.55686803019236,
+          "lng": -71.21786355972291
+        },
+        {
+          "lat": 43.55839192832087,
+          "lng": -71.21887207031251
+        },
+        {
+          "lat": 43.559775843227605,
+          "lng": -71.21977329254152
+        },
+        {
+          "lat": 43.56094203897497,
+          "lng": -71.22048139572145
+        }
+      ],
+      "added": "2026-08-22T21:46:02.973Z",
+      "pointCount": 10,
+      "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
     }
   ],
-  "routes_count": 40
+  "routes_count": 41
 }
