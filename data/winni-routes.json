@@ -1,7 +1,7 @@
 {
   "version": 1,
   "format": "winni-shipped-routes-v1",
-  "updated": "2026-07-15T00:05:30Z",
+  "updated": "2026-08-22T20:05:34Z",
   "note": "Shipped recommended routes. Shipped with the app — not editable by users. User finger-drawn routes live separately in localStorage.winniRoutes.",
   "routes": [
     {
@@ -2919,7 +2919,66 @@
       "added": "2026-07-15T00:04:47.757Z",
       "pointCount": 14,
       "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
+    },
+    {
+      "id": "r1787429077745hpszp",
+      "section": "30",
+      "label": "Lees Mill shoreline (Moultonborough north shore)",
+      "short_label": "Lees Mill",
+      "points": [
+        {
+          "lat": 43.7252426813429,
+          "lng": -71.38855934143068
+        },
+        {
+          "lat": 43.726452188547015,
+          "lng": -71.38776540756227
+        },
+        {
+          "lat": 43.72710345154154,
+          "lng": -71.38742208480836
+        },
+        {
+          "lat": 43.727677177360604,
+          "lng": -71.38703584671022
+        },
+        {
+          "lat": 43.728173368232085,
+          "lng": -71.38695001602174
+        },
+        {
+          "lat": 43.72842146212642,
+          "lng": -71.38731479644777
+        },
+        {
+          "lat": 43.72856101449039,
+          "lng": -71.3876795768738
+        },
+        {
+          "lat": 43.72868506076319,
+          "lng": -71.38797998428346
+        },
+        {
+          "lat": 43.7290571980402,
+          "lng": -71.38825893402101
+        },
+        {
+          "lat": 43.72983247660795,
+          "lng": -71.38851642608644
+        },
+        {
+          "lat": 43.73194118354212,
+          "lng": -71.38911724090578
+        },
+        {
+          "lat": 43.73386376339265,
+          "lng": -71.39010429382326
+        }
+      ],
+      "added": "2026-08-22T20:04:37.745Z",
+      "pointCount": 12,
+      "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
     }
   ],
-  "routes_count": 29
+  "routes_count": 30
 }
