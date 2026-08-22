@@ -1,7 +1,7 @@
 {
   "version": 1,
   "format": "winni-shipped-routes-v1",
-  "updated": "2026-08-22T21:46:27Z",
+  "updated": "2026-08-22T21:48:21Z",
   "note": "Shipped recommended routes. Shipped with the app — not editable by users. User finger-drawn routes live separately in localStorage.winniRoutes.",
   "routes": [
     {
@@ -3931,7 +3931,82 @@
       "added": "2026-08-22T21:46:02.973Z",
       "pointCount": 10,
       "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
+    },
+    {
+      "id": "r17874352768120ieyo",
+      "section": "42",
+      "label": "Around Roberts Cove (Wolfeboro area)",
+      "short_label": "Roberts Cove",
+      "points": [
+        {
+          "lat": 43.53996261645805,
+          "lng": -71.23054504394533
+        },
+        {
+          "lat": 43.53881156954622,
+          "lng": -71.22942924499513
+        },
+        {
+          "lat": 43.53734939718939,
+          "lng": -71.22732639312746
+        },
+        {
+          "lat": 43.53607385617716,
+          "lng": -71.22470855712892
+        },
+        {
+          "lat": 43.53514051639082,
+          "lng": -71.22260570526124
+        },
+        {
+          "lat": 43.5339582652568,
+          "lng": -71.22140407562257
+        },
+        {
+          "lat": 43.53296266737726,
+          "lng": -71.2202024459839
+        },
+        {
+          "lat": 43.53190482662101,
+          "lng": -71.21878623962404
+        },
+        {
+          "lat": 43.53137589928477,
+          "lng": -71.21779918670656
+        },
+        {
+          "lat": 43.53143812627097,
+          "lng": -71.21977329254152
+        },
+        {
+          "lat": 43.53181148683992,
+          "lng": -71.22183322906496
+        },
+        {
+          "lat": 43.53240263634706,
+          "lng": -71.22320652008058
+        },
+        {
+          "lat": 43.53383381642071,
+          "lng": -71.22655391693117
+        },
+        {
+          "lat": 43.534487169945024,
+          "lng": -71.22878551483156
+        },
+        {
+          "lat": 43.53482939991849,
+          "lng": -71.23136043548585
+        },
+        {
+          "lat": 43.535171627949765,
+          "lng": -71.23346328735353
+        }
+      ],
+      "added": "2026-08-22T21:47:56.812Z",
+      "pointCount": 16,
+      "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
     }
   ],
-  "routes_count": 41
+  "routes_count": 42
 }
