@@ -1,7 +1,7 @@
 {
   "version": 1,
   "format": "winni-shipped-routes-v1",
-  "updated": "2026-08-22T20:05:34Z",
+  "updated": "2026-08-22T20:13:59Z",
   "note": "Shipped recommended routes. Shipped with the app — not editable by users. User finger-drawn routes live separately in localStorage.winniRoutes.",
   "routes": [
     {
@@ -2978,7 +2978,89 @@
       "added": "2026-08-22T20:04:37.745Z",
       "pointCount": 12,
       "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
+    },
+    {
+      "id": "r17874293102056cxac",
+      "section": "31",
+      "label": "Along Whaleback Island (Moultonborough north shore)",
+      "short_label": "Whaleback",
+      "points": [
+        {
+          "lat": 43.723777284128566,
+          "lng": -71.38763666152956
+        },
+        {
+          "lat": 43.72367648829357,
+          "lng": -71.38653159141542
+        },
+        {
+          "lat": 43.723560185196305,
+          "lng": -71.3858449459076
+        },
+        {
+          "lat": 43.72341286761563,
+          "lng": -71.38524413108827
+        },
+        {
+          "lat": 43.72318026017172,
+          "lng": -71.3849437236786
+        },
+        {
+          "lat": 43.72304069527186,
+          "lng": -71.38436436653139
+        },
+        {
+          "lat": 43.722939898197545,
+          "lng": -71.3836455345154
+        },
+        {
+          "lat": 43.722839100953614,
+          "lng": -71.38240098953248
+        },
+        {
+          "lat": 43.722784825444336,
+          "lng": -71.38149976730348
+        }
+      ],
+      "added": "2026-08-22T20:08:30.205Z",
+      "pointCount": 9,
+      "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
+    },
+    {
+      "id": "r1787429576543526qu",
+      "section": "32",
+      "label": "Into Little Ganzey cove (Moultonborough north shore)",
+      "short_label": "Little Ganzey",
+      "points": [
+        {
+          "lat": 43.72770043639955,
+          "lng": -71.37959003448488
+        },
+        {
+          "lat": 43.727219747759726,
+          "lng": -71.3793969154358
+        },
+        {
+          "lat": 43.7267390552624,
+          "lng": -71.37923598289491
+        },
+        {
+          "lat": 43.72618858008383,
+          "lng": -71.37919306755067
+        },
+        {
+          "lat": 43.72566911295211,
+          "lng": -71.37925744056703
+        },
+        {
+          "lat": 43.72506435449707,
+          "lng": -71.3795042037964
+        }
+      ],
+      "added": "2026-08-22T20:12:56.543Z",
+      "pointCount": 6,
+      "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
     }
   ],
-  "routes_count": 30
+  "routes_count": 32
 }
