@@ -4978,12 +4978,18 @@ ${trkpts}
         started: new Date().toISOString(),
         points: [],
       };
-      // Live trip line goes into layers.trips so the Trips layer toggle
-      // governs its visibility (consistent with saved trips). Was .addTo(map).
+      // Live trip line goes directly on `map` so it's always visible while
+      // recording, regardless of the "My trips" layer toggle state. The toggle
+      // only governs saved (post-finish) trips — those are added to
+      // layers.trips by addTripToLayer(). Without this, a user with the Trips
+      // toggle off (the default for first-time visitors per AGENTS.md) taps
+      // ⏺ and sees nothing draw, because layers.trips isn't on the map and
+      // the live polyline lives inside it. Reverts part of commit 89f04c2's
+      // .addTo(layers.trips) change for currentTripLine only.
       currentTripLine = L.polyline([], {
         color: '#1abc9c', weight: 4, opacity: 0.9,
         dashArray: '6, 6', lineCap: 'round',
-      }).addTo(layers.trips);
+      }).addTo(map);
     }
 
     function appendTripPoint(lat, lng, speedKn, headingDeg) {
@@ -5015,7 +5021,7 @@ ${trkpts}
           speedKn: 0, headingDeg: null,
         });
       }
-      if (currentTripLine) { layers.trips.removeLayer(currentTripLine); currentTripLine = null; }
+      if (currentTripLine) { map.removeLayer(currentTripLine); currentTripLine = null; }
       if (trip.points.length >= 2) {
         storedTrips.push(trip);
         saveTrips();
