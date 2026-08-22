@@ -2819,7 +2819,7 @@
     // BUOY_SEED pattern. Bump HAZARD_SEED_VERSION when adding/changing
     // entries; users with storedHazards that don't already contain that id
     // will get the new entry on next load.
-    const HAZARD_SEED_VERSION = '1';
+    const HAZARD_SEED_VERSION = '2';
     const HAZARD_SEED_FLAG_KEY = 'winniHazardsSeeded';
     const HAZARD_SEED = [
       // "The Witches" — submerged rock field east of Governor's Island.
@@ -2834,6 +2834,20 @@
         note: "The Witches — submerged rock field, once an island eroded down after the 1850s lake-level rise. Has claimed props and hulls. Coordinate from Tyler's Historic Landmarks reference list 2026-07-12. See also the historic POI entry of the same name for cultural context.",
         seeded: true,
         added: '2026-07-12T00:00:00.000Z',
+      },
+      // Rock marker — Tyler's 2026-08-22 export. Location on the north side
+      // of the lake near Long Island / Governor's Island corridor
+      // (43.6365, -71.3213). Coordinates as captured on device; no note
+      // supplied (the popup will show just type + coords). Anyone in the
+      // area can add a descriptive note by tapping the marker.
+      {
+        id: 'h17873996971060egcv',
+        lat: 43.63652430196609,
+        lng: -71.32126271724702,
+        type: 'rock',
+        note: '',
+        seeded: true,
+        added: '2026-08-22T11:54:57.106Z',
       },
     ];
 
