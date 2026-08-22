@@ -1,7 +1,7 @@
 {
   "version": 1,
   "format": "winni-shipped-routes-v1",
-  "updated": "2026-08-22T21:16:37Z",
+  "updated": "2026-08-22T21:43:36Z",
   "note": "Shipped recommended routes. Shipped with the app — not editable by users. User finger-drawn routes live separately in localStorage.winniRoutes.",
   "routes": [
     {
@@ -3817,7 +3817,70 @@
       "added": "2026-08-22T21:16:07.223Z",
       "pointCount": 10,
       "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
+    },
+    {
+      "id": "r1787434976473ry8oc",
+      "section": "40",
+      "label": "Along Melody Keniston Island (Wolfeboro area)",
+      "short_label": "Melody Keniston",
+      "points": [
+        {
+          "lat": 43.55389787308514,
+          "lng": -71.20938777923585
+        },
+        {
+          "lat": 43.5550486319541,
+          "lng": -71.20925903320314
+        },
+        {
+          "lat": 43.55591946189657,
+          "lng": -71.20915174484254
+        },
+        {
+          "lat": 43.5565103750476,
+          "lng": -71.2093234062195
+        },
+        {
+          "lat": 43.557116832519306,
+          "lng": -71.20964527130128
+        },
+        {
+          "lat": 43.55744338401438,
+          "lng": -71.21016025543214
+        },
+        {
+          "lat": 43.55815868110538,
+          "lng": -71.21093273162843
+        },
+        {
+          "lat": 43.558936168312385,
+          "lng": -71.21200561523439
+        },
+        {
+          "lat": 43.55974474436533,
+          "lng": -71.21320724487306
+        },
+        {
+          "lat": 43.56046001413622,
+          "lng": -71.21385097503664
+        },
+        {
+          "lat": 43.56189052820378,
+          "lng": -71.21372222900392
+        },
+        {
+          "lat": 43.563321008305614,
+          "lng": -71.21305704116823
+        },
+        {
+          "lat": 43.56428500834675,
+          "lng": -71.21200561523439
+        }
+      ],
+      "added": "2026-08-22T21:42:56.474Z",
+      "pointCount": 13,
+      "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
     }
   ],
-  "routes_count": 39
+  "routes_count": 40
 }
