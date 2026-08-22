@@ -1,7 +1,7 @@
 {
   "version": 1,
   "format": "winni-shipped-routes-v1",
-  "updated": "2026-08-22T20:23:19Z",
+  "updated": "2026-08-22T20:42:12Z",
   "note": "Shipped recommended routes. Shipped with the app — not editable by users. User finger-drawn routes live separately in localStorage.winniRoutes.",
   "routes": [
     {
@@ -3287,7 +3287,74 @@
       "added": "2026-08-22T20:22:43.768Z",
       "pointCount": 54,
       "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
+    },
+    {
+      "id": "r1787431305070ngri4",
+      "section": "34",
+      "label": "Around Geneva Point (west shore cove)",
+      "short_label": "Geneva Point",
+      "points": [
+        {
+          "lat": 43.67488691921339,
+          "lng": -71.32066726684572
+        },
+        {
+          "lat": 43.67451444553952,
+          "lng": -71.32092475891115
+        },
+        {
+          "lat": 43.674141969553766,
+          "lng": -71.3216543197632
+        },
+        {
+          "lat": 43.67395573069391,
+          "lng": -71.32264137268068
+        },
+        {
+          "lat": 43.67404885019609,
+          "lng": -71.32354259490968
+        },
+        {
+          "lat": 43.67454548510063,
+          "lng": -71.32384300231935
+        },
+        {
+          "lat": 43.675259390575334,
+          "lng": -71.32405757904054
+        },
+        {
+          "lat": 43.67600432636352,
+          "lng": -71.32384300231935
+        },
+        {
+          "lat": 43.67659406063738,
+          "lng": -71.3231134414673
+        },
+        {
+          "lat": 43.676811329698324,
+          "lng": -71.32212638854982
+        },
+        {
+          "lat": 43.67668717604554,
+          "lng": -71.32105350494386
+        },
+        {
+          "lat": 43.67622159755976,
+          "lng": -71.32036685943605
+        },
+        {
+          "lat": 43.67560082062617,
+          "lng": -71.32015228271486
+        },
+        {
+          "lat": 43.67491795858184,
+          "lng": -71.32058143615724
+        }
+      ],
+      "added": "2026-08-22T20:41:45.070Z",
+      "pointCount": 14,
+      "source": "Recommended route — captain-drawn. Verify on an authoritative cruising chart before transit; not a navigation system."
     }
   ],
-  "routes_count": 33
+  "routes_count": 34
 }
