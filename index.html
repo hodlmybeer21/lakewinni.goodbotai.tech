@@ -5182,6 +5182,7 @@ ${trkpts}
 
     function updateTripRecButton() {
       const btn = document.getElementById('tripRecBtn');
+      const fabBtn = document.getElementById('fabTrip'); // also mirror to the FAB — see note below
       const hudRec = document.getElementById('hudRec');
       if (!btn) return;
       const gpsOn = watchId !== null;
@@ -5195,6 +5196,26 @@ ${trkpts}
           ? 'Stop recording this trip'
           : 'Record this trip';
       if (hudRec) hudRec.classList.toggle('on', recording);
+      // Mirror to the FAB in the bottom action sheet. On mobile the legacy
+      // #tripRecBtn is hidden via CSS (#actions .icon-btn { display: none })
+      // so the FAB is the only ⏺ users see — and if it's not enabled, taps
+      // silently no-op (DOM disabled buttons don't fire click events). Before
+      // this change syncFabTrip() ran ONCE on DOMContentLoaded init, so after
+      // Start GPS the FAB stayed disabled even though #tripRecBtn got
+      // enabled. Symptom: clicks:0, rec:no in the debug strip despite GPS
+      // working (Lake Winni 2026-08-23 bug). Keeping both buttons updated in
+      // lockstep here avoids dual-implementation drift between the legacy
+      // HUD icon-btn and the new FAB.
+      if (fabBtn) {
+        fabBtn.disabled = !gpsOn;
+        fabBtn.classList.toggle('recording', recording);
+        fabBtn.textContent = recording ? '⏹' : '⏺';
+        fabBtn.title = !gpsOn
+          ? 'Record trip (start GPS first)'
+          : recording
+            ? 'Stop recording this trip'
+            : 'Record this trip';
+      }
     }
 
     window.deleteTrip = function(id) {
