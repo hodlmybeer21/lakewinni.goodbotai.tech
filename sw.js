@@ -11,7 +11,6 @@ const PRECACHE = [
 ];
 
 self.addEventListener('install', (event) => {
-  console.log('[winni-sw] installing — cache:', CACHE_NAME);
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE)).catch(() => {})
   );
@@ -19,12 +18,10 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('[winni-sw] activating — clearing old caches');
   event.waitUntil(
-    caches.keys().then((keys) => {
-      console.log('[winni-sw] found caches:', keys);
-      return Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)));
-    })
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
   );
   self.clients.claim();
 });

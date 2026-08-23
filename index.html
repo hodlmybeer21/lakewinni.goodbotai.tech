@@ -652,25 +652,6 @@
       background: #c0392b;
       animation: tripRecPulse 1.4s ease-in-out infinite;
     }
-    /* Trip-rec debug strip (temporary — remove once ⏺ confirmed working on-device) */
-    #tripRecDebug {
-      position: absolute;
-      top: calc(env(safe-area-inset-top, 0px) + 4px);
-      left: 50%;
-      transform: translateX(-50%);
-      max-width: calc(100vw - 24px);
-      background: rgba(0, 0, 0, 0.82);
-      color: #5f5;
-      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-      font-size: 10px;
-      line-height: 1.35;
-      padding: 4px 8px;
-      border-radius: 4px;
-      z-index: 10000;
-      pointer-events: none;
-      white-space: pre;
-      text-align: center;
-    }
     /* More menu — vertical popover above the More button.
        Anchored right-aligned so it doesn't push past the viewport on
        narrow phones. max-width + viewport clamp guarantee no horizontal
@@ -1946,9 +1927,6 @@
       <span id="hudGpsText">GPS off</span>
     </div>
   </div>
-
-  <!-- Trip-rec debug strip (temporary — remove once ⏺ confirmed working on-device) -->
-  <pre id="tripRecDebug" aria-hidden="true">[trip-rec debug loading…]</pre>
 
   <!-- Search bar + results overlay (top center) -->
   <div id="searchBar" class="hud" role="search" aria-label="Search places on the lake">
@@ -5049,7 +5027,6 @@ ${trkpts}
     }
 
     function startNewTrip(name) {
-      console.log('[trip-rec] startNewTrip(', name, ') — creating currentTrip + currentTripLine');
       currentTrip = {
         id: 't' + Date.now() + Math.random().toString(36).slice(2, 7),
         name: name || ('Trip ' + new Date().toLocaleString()),
@@ -5068,8 +5045,6 @@ ${trkpts}
         color: '#1abc9c', weight: 4, opacity: 0.9,
         dashArray: '6, 6', lineCap: 'round',
       }).addTo(map);
-      console.log('[trip-rec] startNewTrip done — currentTrip set, currentTripLine added to map');
-      if (typeof window.updateTripRecDebug === 'function') window.updateTripRecDebug('startNewTrip done');
     }
 
     function appendTripPoint(lat, lng, speedKn, headingDeg) {
@@ -5087,8 +5062,6 @@ ${trkpts}
     }
 
     function finishTrip() {
-      console.log('[trip-rec] finishTrip entry');
-      if (typeof window.updateTripRecDebug === 'function') window.updateTripRecDebug('finishTrip');
       if (!currentTrip) return null;
       const trip = currentTrip;
       currentTrip = null;
@@ -5104,8 +5077,6 @@ ${trkpts}
         });
       }
       if (currentTripLine) { map.removeLayer(currentTripLine); currentTripLine = null; }
-      console.log('[trip-rec] finishTrip done — line removed from map');
-      if (typeof window.updateTripRecDebug === 'function') window.updateTripRecDebug('finishTrip done');
       if (trip.points.length >= 2) {
         storedTrips.push(trip);
         saveTrips();
@@ -5125,12 +5096,7 @@ ${trkpts}
     // and stopTripRecording(); state mirrored to the button + HUD indicator
     // via updateTripRecButton().
     function startTripRecording() {
-      console.log('[trip-rec] startTripRecording entry — watchId=', watchId, 'currentTrip=', currentTrip);
-      if (typeof window.updateTripRecDebug === 'function') window.updateTripRecDebug('startTripRecording entry — guard=' + (watchId === null || currentTrip ? 'FAIL' : 'PASS'));
-      if (watchId === null || currentTrip) {
-        console.log('[trip-rec] startTripRecording ABORTED by guard');
-        return;
-      }
+      if (watchId === null || currentTrip) return;
       startNewTrip('Trip ' + new Date().toLocaleString());
       // Auto-enable the Trips layer so the user sees the line draw live.
       const layerTripsCheckbox = document.getElementById('layerTrips');
@@ -5151,17 +5117,10 @@ ${trkpts}
         if (currentTripLine) currentTripLine.addLatLng([lastPos.lat, lastPos.lng]);
       }
       updateTripRecButton();
-      console.log('[trip-rec] startTripRecording SUCCESS');
-      if (typeof window.updateTripRecDebug === 'function') window.updateTripRecDebug('startTripRecording SUCCESS');
     }
 
     function stopTripRecording() {
-      console.log('[trip-rec] stopTripRecording entry — currentTrip=', !!currentTrip);
-      if (typeof window.updateTripRecDebug === 'function') window.updateTripRecDebug('stopTripRecording entry');
-      if (!currentTrip) {
-        console.log('[trip-rec] stopTripRecording ABORTED — no currentTrip');
-        return;
-      }
+      if (!currentTrip) return;
       const finishedTrip = finishTrip();
       updateTripRecButton();
       if (finishedTrip) {
@@ -5176,8 +5135,6 @@ ${trkpts}
           3000
         );
       }
-      console.log('[trip-rec] stopTripRecording done');
-      if (typeof window.updateTripRecDebug === 'function') window.updateTripRecDebug('stopTripRecording done');
     }
 
     function updateTripRecButton() {
@@ -5316,7 +5273,6 @@ ${tracks}
       // 2026-07-25 fix) read watchId===null and locked the button
       // disabled for the rest of the session.
       updateTripRecButton();
-      if (typeof window.updateTripRecDebug === 'function') window.updateTripRecDebug('GPS started — watchId=' + watchId);
 
       // Try to use device orientation for heading if available
       if (window.DeviceOrientationEvent) {
@@ -5355,7 +5311,6 @@ ${tracks}
       window.removeEventListener('deviceorientation', onOrient);
       // GPS off → trip recording is unavailable; sync the button.
       updateTripRecButton();
-      if (typeof window.updateTripRecDebug === 'function') window.updateTripRecDebug('GPS stopped');
     }
 
     function promptNameTrip(trip) {
@@ -6502,64 +6457,6 @@ ${tracks}
 
       // Mirror trip-rec button state to the new FAB after init
       if (typeof window.syncFabTrip === 'function') window.syncFabTrip();
-
-      // === Temporary trip-rec debug instrumentation (commit d79e3b5) ===
-      // Remove once ⏺ is confirmed working on-device. Captures clicks in
-      // capture phase so we can tell "click never reached the button" from
-      // "click reached but handler didn't do anything."
-      (function setupTripRecDebug() {
-        const dbg = window.__tripRecDbg = { clicks: 0, lastClickAt: null, lastEvent: 'boot' };
-        function snapshot() {
-          const gpsOn = (typeof watchId !== 'undefined' && watchId !== null);
-          const hasLastPos = (typeof lastPos !== 'undefined' && lastPos);
-          const recording = (typeof currentTrip !== 'undefined' && !!currentTrip);
-          const lineExists = (typeof currentTripLine !== 'undefined' && !!currentTripLine);
-          const lineOnMap = lineExists && currentTripLine._map ? 'on-map' : (lineExists ? 'orphan' : '-');
-          return {
-            gpsOn,
-            lastPos: hasLastPos ? [+lastPos.lat.toFixed(5), +lastPos.lng.toFixed(5)] : null,
-            recording,
-            lineExists,
-            lineOnMap,
-            clicks: dbg.clicks,
-            lastEvent: dbg.lastEvent,
-          };
-        }
-        function render(event) {
-          if (event !== undefined) dbg.lastEvent = event;
-          const el = document.getElementById('tripRecDebug');
-          if (!el) return;
-          const s = snapshot();
-          el.textContent =
-            '[trip-rec debug \u2014 tap \u23fa and tell Goodbot what you see]\n' +
-            'GPS:' + (s.gpsOn ? 'on' : 'OFF') +
-            ' lastPos:' + (s.lastPos ? s.lastPos.join(',') : 'NULL') +
-            ' rec:' + (s.recording ? 'YES' : 'no') +
-            ' line:' + (s.lineExists ? '\u2713' : '\u2717') + '(' + s.lineOnMap + ')' +
-            ' clicks:' + s.clicks + '\n' +
-            'last: ' + s.lastEvent;
-        }
-        window.updateTripRecDebug = render;
-        window.__tripRecSnapshot = snapshot;
-
-        function attachCaptureLogger(btn, name) {
-          if (!btn) return;
-          btn.addEventListener('click', () => {
-            dbg.clicks++;
-            dbg.lastClickAt = new Date().toISOString();
-            const s = snapshot();
-            dbg.lastEvent = name + ' click #' + dbg.clicks + ' (pre-handler state)';
-            console.log('[trip-rec]', name, 'clicked', s);
-            render();
-          }, true);  // capture phase — fires before the real handler
-        }
-
-        attachCaptureLogger(document.getElementById('fabTrip'), 'fabTrip');
-        attachCaptureLogger(document.getElementById('tripRecBtn'), 'tripRecBtn');
-        render('boot \u2014 debug instrumentation live');
-        setInterval(render, 1000);
-        console.log('[trip-rec] debug instrumentation installed. window.__tripRecSnapshot() for live state.');
-      })();
     });
   </script>
 </body>
