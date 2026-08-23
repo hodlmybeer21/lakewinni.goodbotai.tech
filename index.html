@@ -5443,17 +5443,30 @@ ${tracks}
       } else if (lastHeading != null) {
         headingDeg = lastHeading;
       }
-      if (headingDeg != null) {
-        lastHeading = headingDeg;
-        document.getElementById('heading').textContent = headingDeg.toFixed(0);
-        userMarker.setRotationAngle(headingDeg);
-      }
-
+      // Persist the GPS fix BEFORE heading/rotation so even if those throw,
+      // the trip recorder still gets the point. Without this, on 2026-08-23
+      // Tyler's tap on ⏺ produced an empty trip line (no dashed line) because
+      // the Leaflet.rotate plugin isn't loaded — setRotationAngle threw a
+      // TypeError, aborting onPos before lastPos / appendTripPoint ran. The
+      // HUD updates above still rendered (they happen before the throw), which
+      // is why speed/heading/position showed fine but lastPos stayed NULL.
       lastPos = { lat: c.latitude, lng: c.longitude };
       lastTime = now;
 
       // Record this point in the current trip (throttled inside)
       appendTripPoint(c.latitude, c.longitude, speedKn, headingDeg);
+
+      if (headingDeg != null) {
+        lastHeading = headingDeg;
+        document.getElementById('heading').textContent = headingDeg.toFixed(0);
+        // Leaflet.rotate plugin isn't loaded — guard so a missing method
+        // doesn't kill onPos and silently break every downstream feature
+        // (trip recording, accuracy circle updates, etc.). The vessel icon
+        // just won't auto-rotate; the HUD heading text still shows.
+        if (userMarker && typeof userMarker.setRotationAngle === 'function') {
+          userMarker.setRotationAngle(headingDeg);
+        }
+      }
     }
 
     let lastHeading = null;
@@ -5478,14 +5491,20 @@ ${tracks}
         lastHeading = e.webkitCompassHeading;
         document.getElementById('heading').textContent = e.webkitCompassHeading.toFixed(0);
         document.getElementById('compass').style.transform = `rotate(${-e.webkitCompassHeading}deg)`;
-        if (userMarker) userMarker.setRotationAngle(e.webkitCompassHeading);
+        // Same guard as onPos — Leaflet.rotate plugin isn't loaded.
+        if (userMarker && typeof userMarker.setRotationAngle === 'function') {
+          userMarker.setRotationAngle(e.webkitCompassHeading);
+        }
       } else if (e.alpha != null) {
         // Android
         const h = (360 - e.alpha) % 360;
         lastHeading = h;
         document.getElementById('heading').textContent = h.toFixed(0);
         document.getElementById('compass').style.transform = `rotate(${e.alpha}deg)`;
-        if (userMarker) userMarker.setRotationAngle(h);
+        // Same guard as onPos — Leaflet.rotate plugin isn't loaded.
+        if (userMarker && typeof userMarker.setRotationAngle === 'function') {
+          userMarker.setRotationAngle(h);
+        }
       }
     }
 
