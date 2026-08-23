@@ -1314,6 +1314,52 @@
       border-bottom: 16px solid #c0392b;
       filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
     }
+    /* Rock hazards use a rock-shape icon instead of the default triangle.
+       Asymmetric border-radius makes it look lumpy. Specificity (.hazard-marker.rock)
+       wins over the single-class triangle rule; inline background is suppressed by
+       hazardIcon() when type==='rock' so the CSS color wins. */
+    .hazard-marker.rock {
+      width: 18px;
+      height: 16px;
+      background: #6b6b6b;
+      border: none;
+      border-radius: 30% 70% 50% 50% / 30% 50% 70% 50%;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+    }
+    /* No-wake buoy: orange circle with white "NW" text overlay.
+       Inherits size/border from .buoy-marker; adds background + ::after label. */
+    .buoy-nowake {
+      background: #ff6b1a;
+      position: relative;
+    }
+    .buoy-nowake::after {
+      content: "NW";
+      position: absolute;
+      font-size: 7px;
+      font-weight: bold;
+      color: white;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      line-height: 1;
+    }
+    /* Lighted buoy: glowing amber star above the buoy.
+       Star is positioned at top:-8px so it floats just above the circle;
+       text-shadow gives the soft halo effect. */
+    .buoy-light {
+      position: relative;
+    }
+    .buoy-light::before {
+      content: "✦";
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #ffeb3b;
+      font-size: 11px;
+      text-shadow: 0 0 3px #ff9800;
+      line-height: 1;
+    }
     .depth-marker {
       width: 22px;
       height: 22px;
@@ -2776,6 +2822,8 @@
       white:  { label: 'White/spar',         color: 'white',  note: 'Information or hazard marker.' },
       yellow: { label: 'Yellow hazard',      color: 'yellow', note: 'Caution — rock, shoal, or obstruction.' },
       black:  { label: 'Black (special mark)', color: 'black', note: 'Special mark — dredged channel, isolated danger, no-wake/protected zone, or other regulatory. Look for wording on the buoy itself; not a lateral marker.' },
+      nowake: { label: 'No-wake / regulatory zone', color: 'nowake', note: 'Slow / no-wake zone. Often an orange regulatory marker — look for the "NW" or "Slow" wording on the buoy itself.' },
+      light:  { label: 'Lighted buoy',              color: 'light',  note: "Buoy with a light — indicates its position at night or in low visibility. Light flash rhythm usually conveys the buoy's purpose (e.g., flashing red = port)." },
     };
 
     // ----- Hazard CRUD -----
@@ -2788,10 +2836,17 @@
     };
 
     function hazardIcon(type) {
-      const color = (HAZARD_TYPES[type] || HAZARD_TYPES.other).color;
+      // Rock hazards get a dedicated rock-shape icon (see .hazard-marker.rock CSS).
+      // For rock, suppress the inline background so the CSS color (#6b6b6b) wins
+      // — the default triangle fill color would otherwise bleed through the
+      // CSS class and make the rock look red.
+      const isRock = type === 'rock';
+      const color = isRock ? '#6b6b6b' : (HAZARD_TYPES[type] || HAZARD_TYPES.other).color;
+      const styleAttr = isRock ? '' : ` style="background:${color};"`;
+      const extraClass = isRock ? ' rock' : '';
       return L.divIcon({
         className: '',
-        html: `<div class="hazard-marker" style="background:${color};"></div>`,
+        html: `<div class="hazard-marker${extraClass}"${styleAttr}></div>`,
         iconSize: [18, 18],
         iconAnchor: [9, 9],
       });
