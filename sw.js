@@ -2,7 +2,7 @@
  * Caches the app shell + static assets so the PWA opens fast and works
  * offline once visited. Map tiles and NH GRANIT bathymetry are intentionally
  * NOT cached (they're huge and have their own upstream caching). */
-const CACHE_NAME = 'winni-nav-v1';
+const CACHE_NAME = 'winni-nav-v2'; // bumped 2026-08-23 to invalidate any stale HTML cached by a flaky reload (boat-network SW fallback)
 const PRECACHE = [
   '/',
   '/index.html',
@@ -11,6 +11,7 @@ const PRECACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  console.log('[winni-sw] installing — cache:', CACHE_NAME);
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE)).catch(() => {})
   );
@@ -18,10 +19,12 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  console.log('[winni-sw] activating — clearing old caches');
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    caches.keys().then((keys) => {
+      console.log('[winni-sw] found caches:', keys);
+      return Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)));
+    })
   );
   self.clients.claim();
 });
