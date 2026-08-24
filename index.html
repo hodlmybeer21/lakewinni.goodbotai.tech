@@ -687,6 +687,87 @@
       box-shadow: 1px 1px 2px rgba(15, 23, 42, 0.06);
       z-index: -1;
     }
+
+    /* Lock-on-boat toggle — floats above the action sheet on the right
+       so it never collides with the centered sheet or the layers panel. */
+    #lockBtn {
+      display: none;                 /* shown by setFollow when GPS is on */
+      position: absolute;
+      right: 16px;
+      bottom: calc(env(safe-area-inset-bottom, 16px) + 88px);
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: rgba(10, 61, 98, 0.92);
+      color: var(--white);
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      font-size: 22px;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: background 0.15s ease, border-color 0.15s ease,
+                  transform 0.12s ease, box-shadow 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #lockBtn.visible { display: flex; }
+    #lockBtn:active { transform: scale(0.95); }
+    #lockBtn.on {
+      background: var(--teal-700);
+      border-color: rgba(255, 255, 255, 0.45);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.35),
+                  0 3px 8px rgba(0, 0, 0, 0.35);
+    }
+    /* Soft pulse while follow is on so it's obvious the lock is engaged
+       without being noisy. Disabled when prefers-reduced-motion. */
+    #lockBtn.on {
+      animation: lockPulse 2.4s ease-in-out infinite;
+    }
+    @keyframes lockPulse {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.35),
+                              0 3px 8px rgba(0, 0, 0, 0.35); }
+      50%      { box-shadow: 0 0 0 6px rgba(15, 118, 110, 0.15),
+                              0 3px 8px rgba(0, 0, 0, 0.35); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #lockBtn.on { animation: none; }
+    }
+
+    /* Recenter pill — appears at top-center when the user has manually
+       panned/zoomed away while GPS is on. Tap to re-engage follow. */
+    #recenterPill {
+      position: absolute;
+      left: 50%;
+      top: calc(env(safe-area-inset-top, 0) + 78px);
+      transform: translateX(-50%);
+      background: rgba(10, 61, 98, 0.95);
+      color: var(--white);
+      border: none;
+      border-radius: 999px;
+      padding: 8px 14px 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+      display: none;
+      align-items: center;
+      gap: 6px;
+      z-index: 1001;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      backdrop-filter: blur(6px);
+    }
+    #recenterPill.show { display: inline-flex; }
+    #recenterPill:active { transform: translateX(-50%) scale(0.97); }
+    #recenterPill .pico {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--teal-500);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
     #moreMenu .menu-title {
       font-size: 11px;
       text-transform: uppercase;
@@ -1967,6 +2048,24 @@
     </div>
   </div>
 
+  <!-- Lock-on-boat toggle (visible only when GPS is on). Floats above the
+       action sheet on the right side so it never overlaps it. -->
+  <button id="lockBtn" type="button"
+          title="Lock on boat — map follows your GPS position"
+          aria-label="Lock on boat"
+          aria-pressed="false"
+          onclick="toggleFollow()">🔓</button>
+
+  <!-- Recenter pill — appears at top-center after the user manually pans
+       or zooms away while GPS is on. Tapping re-engages follow. -->
+  <button id="recenterPill" type="button"
+          title="Recenter on boat"
+          aria-label="Recenter on boat"
+          onclick="recenterFromPill()">
+    <span class="pico" aria-hidden="true">📍</span>
+    <span>Recenter on boat</span>
+  </button>
+
   <!-- PWA install banner -->
   <div id="pwaInstall" class="hud" role="dialog" aria-label="Install Winni Nav">
     <span aria-hidden="true">📲</span>
@@ -2813,6 +2912,31 @@
       layers.bathyBands = L.layerGroup();
 
       map.on('click', onMapClick);
+
+      // ----- GPS follow / lock-on-boat gesture detection -----
+      // Any user-initiated pan/zoom disengages follow mode so they can
+      // look at the rest of the lake without the map yanking back.
+      // dragstart is unambiguous (only fires for user drags). zoomstart
+      // and movestart can also fire from our own programmatic panTo /
+      // setView — guard those with the programmaticMove flag (set/cleared
+      // by setFollow() and the per-fix panTo in onPos()).
+      map.on('dragstart', () => {
+        if (typeof gpsFollow !== 'undefined' && gpsFollow) {
+          setFollow(false, { userGesture: true });
+        }
+        programmaticMove = false;
+      });
+      map.on('zoomstart', () => {
+        if (programmaticMove) return;
+        if (gpsFollow) setFollow(false, { userGesture: true });
+      });
+      map.on('movestart', () => {
+        if (programmaticMove) return;
+        if (gpsFollow) setFollow(false, { userGesture: true });
+      });
+      map.on('moveend', () => {
+        programmaticMove = false;
+      });
     }
 
     // ----- Buoy CRUD -----
@@ -5241,6 +5365,118 @@ ${tracks}
       URL.revokeObjectURL(url);
     };
 
+    // ----- GPS follow / lock-on-boat -----
+    //
+    // When GPS is on, follow mode auto-pans the map to the boat's
+    // current position on every fix so the boat stays centered. The
+    // lock button (#lockBtn, bottom-right) toggles follow on/off. Any
+    // manual pan/zoom disables follow and surfaces a "Recenter on boat"
+    // pill at the top — tap it to re-engage. While follow is on, the
+    // Screen Wake Lock API keeps the phone awake so the map stays
+    // visible while underway. Falls back gracefully on browsers that
+    // don't support Wake Lock (the follow feature still works).
+    let gpsFollow = false;
+    let wakeLock = null;
+    let programmaticMove = false;
+
+    function updateLockBtn() {
+      const btn = document.getElementById('lockBtn');
+      if (!btn) return;
+      if (gpsFollow) {
+        btn.textContent = '\u{1F512}';  // 🔒
+        btn.classList.add('on');
+        btn.setAttribute('aria-pressed', 'true');
+        btn.setAttribute('title', 'Unlock \u2014 map free to pan');
+      } else {
+        btn.textContent = '\u{1F513}';  // 🔓
+        btn.classList.remove('on');
+        btn.setAttribute('aria-pressed', 'false');
+        btn.setAttribute('title', 'Lock on boat \u2014 map follows your GPS position');
+      }
+    }
+
+    function updateRecenterPill() {
+      const pill = document.getElementById('recenterPill');
+      if (!pill) return;
+      // Pill shows when GPS is on, follow is off, and we have a boat fix.
+      const show = (watchId !== null) && !gpsFollow && !!userMarker;
+      pill.classList.toggle('show', show);
+    }
+
+    async function acquireWakeLock() {
+      if (!('wakeLock' in navigator)) return;  // unsupported, no-op
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => {
+          // Auto-released (tab hidden, screen locked, low battery).
+          // Clear our reference so visibilitychange can re-acquire
+          // when the tab becomes visible again.
+          wakeLock = null;
+          if (gpsFollow && document.visibilityState === 'visible') {
+            acquireWakeLock();
+          }
+        });
+      } catch (err) {
+        // Permission / low battery / etc — non-fatal; follow still works.
+        console.warn('Wake Lock request failed:', err);
+        wakeLock = null;
+      }
+    }
+
+    function releaseWakeLock() {
+      if (wakeLock) {
+        try { wakeLock.release(); } catch (e) { /* already released */ }
+        wakeLock = null;
+      }
+    }
+
+    // Lock button visibility depends on GPS state (not follow state) —
+    // the button exists whenever GPS is on so users can re-engage follow
+    // after panning. Called from startTracking() / stopTracking().
+    function syncLockBtnVisibility() {
+      const btn = document.getElementById('lockBtn');
+      if (!btn) return;
+      btn.classList.toggle('visible', watchId !== null);
+    }
+
+    function setFollow(on, opts = {}) {
+      const wasOn = gpsFollow;
+      gpsFollow = !!on;
+      updateLockBtn();
+      updateRecenterPill();
+
+      if (gpsFollow && !wasOn) {
+        // Just turned on.
+        acquireWakeLock();
+        if (opts.recenter && userMarker) {
+          programmaticMove = true;
+          map.panTo(userMarker.getLatLng(), { animate: true, duration: 0.6 });
+        }
+      } else if (!gpsFollow && wasOn) {
+        // Just turned off.
+        releaseWakeLock();
+      }
+    }
+
+    window.toggleFollow = function() {
+      if (watchId === null) return;  // hidden when GPS off; defensive guard
+      const willTurnOn = !gpsFollow;
+      setFollow(willTurnOn, { recenter: willTurnOn });
+    };
+
+    window.recenterFromPill = function() {
+      if (watchId === null) return;
+      setFollow(true, { recenter: true });
+    };
+
+    // Re-acquire wake lock when returning to the tab if follow is still
+    // on and the OS auto-released it while we were backgrounded.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && gpsFollow && !wakeLock) {
+        acquireWakeLock();
+      }
+    });
+
     // ----- GPS tracking -----
     // Helper for the compact HUD GPS strip: sets status text + dot class.
     function setGpsStatus(text, state) {
@@ -5273,6 +5509,12 @@ ${tracks}
       // 2026-07-25 fix) read watchId===null and locked the button
       // disabled for the rest of the session.
       updateTripRecButton();
+
+      // GPS is now active — show the lock button and engage follow by
+      // default so the map recenters on the boat. User can disable
+      // follow via the lock button or any manual pan/zoom.
+      syncLockBtnVisibility();
+      setFollow(true, { recenter: true });
 
       // Try to use device orientation for heading if available
       if (window.DeviceOrientationEvent) {
@@ -5311,6 +5553,11 @@ ${tracks}
       window.removeEventListener('deviceorientation', onOrient);
       // GPS off → trip recording is unavailable; sync the button.
       updateTripRecButton();
+
+      // Disable follow mode (releases the screen wake lock, hides the
+      // recenter pill) and hide the lock button itself.
+      setFollow(false);
+      syncLockBtnVisibility();
     }
 
     function promptNameTrip(trip) {
@@ -5442,6 +5689,17 @@ ${tracks}
         if (userMarker && typeof userMarker.setRotationAngle === 'function') {
           userMarker.setRotationAngle(headingDeg);
         }
+      }
+
+      // Follow mode — keep the boat centered as the GPS position updates.
+      // Only pan when follow is engaged; the user can disable follow via
+      // the lock button or any manual drag/zoom (handled by map's
+      // dragstart / zoomstart / movestart listeners in initMap).
+      // The programmaticMove guard prevents our own panTo from being
+      // mistaken for a user gesture and immediately turning follow off.
+      if (gpsFollow) {
+        programmaticMove = true;
+        map.panTo(latlng, { animate: true, duration: 0.6 });
       }
     }
 
