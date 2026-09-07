@@ -2,7 +2,7 @@
  * Caches the app shell + static assets so the PWA opens fast and works
  * offline once visited. Map tiles and NH GRANIT bathymetry are intentionally
  * NOT cached (they're huge and have their own upstream caching). */
-const CACHE_NAME = 'winni-nav-v2'; // bumped 2026-08-23 to invalidate any stale HTML cached by a flaky reload (boat-network SW fallback)
+const CACHE_NAME = 'winni-nav-v3'; // bumped 2026-09-07 to drop any v2 caches from Tyler's stuck-refresh state — bypasses the "clear browser data" workaround that nukes localStorage.
 const PRECACHE = [
   '/',
   '/index.html',
@@ -24,6 +24,18 @@ self.addEventListener('activate', (event) => {
     )
   );
   self.clients.claim();
+});
+
+self.addEventListener('message', (event) => {
+  // The in-app "🔄 Check for app updates" button (see checkForAppUpdate()
+  // in index.html) posts SKIP_WAITING after calling registration.update(),
+  // so the new worker can take over without waiting for every tab to close.
+  // Without this handler the message is silently dropped and users stay on
+  // the cached old code until they full-clear browsing data — which is
+  // exactly the workaround this feature replaces.
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {

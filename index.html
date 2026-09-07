@@ -6863,7 +6863,7 @@ ${tracks}
             Tap 📍 then tap the map to add a buoy, hazard, POI, or depth sounding — pick which in the popup.<br>
             Tap a ⚓ marina marker for hours, services, “Route to here”, and (when added) a phone link.<br>
             Tap 🆘 to see your exact lat/lng, nearest launch, nearest marina, and one-tap links to 911 / NH Marine Patrol / share-my-location.<br>
-            Tap 🛶 to view, rename, export (GPX), or delete past trips.<br>
+            Tap 🛶 to view, rename, export (GPX), delete, or <strong>📥 import</strong> past trips.<br>
             Tap the 🚤 boat icon to pick your vessel — the icon shown at your GPS location. 9 options from speedboat to mermaid. Your choice is saved locally and applied immediately.<br>
             Trips auto-record while GPS is on and auto-save when you stop.<br>
             Tap a shipped (teal) route line for label, distance, GPX export, and "Route to start" in Google Maps.
@@ -6880,6 +6880,19 @@ ${tracks}
             <strong>Bridges & clearance:</strong> ${BRIDGES.length} (off by default).<br>
             Use 💾 to export your data as JSON, or 🛶 to export trips as GPX.<br>
             To restore after a browser reset: 🛶 → <strong>📥 Import GPX…</strong> (trips) or re-import the 💾 JSON (all layers).
+          </p>
+          <hr style="border:none;border-top:1px solid #eee;margin:12px 0;" />
+          <p style="font-size:12px;color:#666;">
+            <strong>App maintenance</strong> — keep this phone's data clean without touching other websites.<br>
+            <span style="opacity:0.85;">Both buttons act <em>only</em> on this site — localStorage and the service-worker cache are origin-scoped, so other sites and tabs are never affected.</span>
+          </p>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+            <button class="btn btn-secondary" style="font-size:12px;padding:6px 10px;" onclick="checkForAppUpdate()">🔄 Check for app updates</button>
+            <button class="btn btn-secondary" style="font-size:12px;padding:6px 10px;color:#c0392b;" onclick="confirmResetAppData()">🧹 Reset app data…</button>
+          </div>
+          <p style="font-size:11px;color:#888;margin-top:10px;line-height:1.4;">
+            <strong>Check for app updates</strong> tells the service worker to fetch the latest code from Vercel and reload. Use it if the app feels stuck on an older version (no local data is touched).<br>
+            <strong>Reset app data</strong> wipes <em>only</em> this site&apos;s localStorage and caches — trips, buoys, hazards, POIs, vessel choice, layer state, and service-worker cache. The browser&apos;s main &ldquo;Clear browsing data&rdquo; menu clears <em>everything</em>; this button is the safe in-app equivalent.
           </p>
           <p style="font-size:12px;color:#666;margin-top:12px;">
             <a href="#" onclick="resetSafetyDisclaimer(); cancelModal(); return false;">🔄 Re-show safety disclaimer</a>
@@ -7282,7 +7295,7 @@ ${tracks}
           Tap 📍 then tap the map to add a buoy, hazard, POI, or depth sounding — pick which in the popup.<br>
           Tap a ⚓ marina marker for hours, services, “Route to here”, and (when added) a phone link.<br>
           Tap 🆘 to see your exact lat/lng, nearest launch, nearest marina, and one-tap links to 911 / NH Marine Patrol / share-my-location.<br>
-          Tap 🛶 to view, rename, export (GPX), or delete past trips.<br>
+          Tap 🛶 to view, rename, export (GPX), delete, or <strong>📥 import</strong> past trips.<br>
           Tap the 🚤 boat icon to pick your vessel — the icon shown at your GPS location. 9 options from speedboat to mermaid. Your choice is saved locally and applied immediately.<br>
           Trips auto-record while GPS is on and auto-save when you stop.<br>
           Tap a shipped (orange) route line for label, distance, GPX export, and "Route to start" in Google Maps.
@@ -7300,6 +7313,19 @@ ${tracks}
           Use 💾 to export your data as JSON, or 🛶 to export trips as GPX.<br>
           To restore after a browser reset: 🛶 → <strong>📥 Import GPX…</strong> (trips) or re-import the 💾 JSON (all layers).
         </p>
+        <hr style="border:none;border-top:1px solid #eee;margin:12px 0;" />
+        <p style="font-size:12px;color:#666;">
+          <strong>App maintenance</strong> — keep this phone&apos;s data clean without touching other websites.<br>
+          <span style="opacity:0.85;">Both buttons act <em>only</em> on this site — localStorage and the service-worker cache are origin-scoped, so other sites and tabs are never affected.</span>
+        </p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+          <button class="btn btn-secondary" style="font-size:12px;padding:6px 10px;" onclick="checkForAppUpdate()">🔄 Check for app updates</button>
+          <button class="btn btn-secondary" style="font-size:12px;padding:6px 10px;color:#c0392b;" onclick="confirmResetAppData()">🧹 Reset app data…</button>
+        </div>
+        <p style="font-size:11px;color:#888;margin-top:10px;line-height:1.4;">
+          <strong>Check for app updates</strong> tells the service worker to fetch the latest code from Vercel and reload. Use it if the app feels stuck on an older version (no local data is touched).<br>
+          <strong>Reset app data</strong> wipes <em>only</em> this site&apos;s localStorage and caches — trips, buoys, hazards, POIs, vessel choice, layer state, and service-worker cache. The browser&apos;s main &ldquo;Clear browsing data&rdquo; menu clears <em>everything</em>; this button is the safe in-app equivalent.
+        </p>
         <p style="font-size:12px;color:#666;margin-top:12px;">
           <a href="#" onclick="resetSafetyDisclaimer(); cancelModal(); return false;">🔄 Re-show safety disclaimer</a>
         </p>
@@ -7307,6 +7333,129 @@ ${tracks}
       actions.innerHTML = `<button class="btn btn-primary" onclick="cancelModal()">Close</button>`;
       modal.classList.add('show');
     }
+    // ====================================================================
+    // App maintenance — in-app update + reset (origin-scoped, NEVER
+    // touches other websites or other tabs). Replaces the "clear all
+    // browser data" workaround that nukes localStorage along with the
+    // SW bug.
+    //
+    //   "Check for app updates" — pulls fresh code from Vercel via the
+    //     service-worker update flow. Solves "I can't refresh the site"
+    //     without touching localStorage.
+    //   "Reset app data" — wipes ONLY this origin's localStorage and
+    //     SW caches. localStorage and CacheStorage are origin-scoped by
+    //     the browser, so other sites/tabs are unaffected. Safe in-app
+    //     equivalent of "Clear browsing data".
+    //
+    // Both are window-exposed for the info-modal onclick handlers.
+    // ====================================================================
+    window.checkForAppUpdate = async function() {
+      // Close whatever modal triggered us so the user sees the flash toast.
+      if (typeof cancelModal === 'function') {
+        try { cancelModal(); } catch (e) {}
+      }
+      if (!('serviceWorker' in navigator)) {
+        flashRouteMessage('ℹ This browser does not support offline caching. Hard-refreshing…', 4000);
+        setTimeout(() => location.reload(), 800);
+        return;
+      }
+      try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (!reg) {
+          flashRouteMessage('ℹ No offline cache installed yet. Hard-refreshing…', 3000);
+          setTimeout(() => location.reload(), 800);
+          return;
+        }
+        // Fetch sw.js again — this is what tells the browser "there might be
+        // a new version." If the bytes match, the existing worker keeps
+        // controlling; if they differ, a new worker starts installing.
+        await reg.update();
+        if (reg.waiting) {
+          // Update found and already installed — force it to take over now
+          // and reload the page so the new HTML/JS actually runs (otherwise
+          // the page keeps executing the old code it already loaded).
+          try { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {}
+          flashRouteMessage('🔄 Update applied — reloading…', 2500);
+          setTimeout(() => location.reload(), 800);
+          return;
+        }
+        if (reg.installing) {
+          // First install in progress (or update still installing). Wait for
+          // it, then activate + reload. Failsafe timer in case statechange
+          // never fires (e.g. SW was deleted between calls).
+          flashRouteMessage('🔄 Installing latest version — reloading in a sec…', 3000);
+          const sw = reg.installing;
+          const done = () => {
+            try { sw.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {}
+            setTimeout(() => location.reload(), 400);
+          };
+          sw.addEventListener('statechange', () => {
+            if (sw.state === 'installed' || sw.state === 'activated') done();
+          });
+          setTimeout(() => location.reload(), 5000);
+          return;
+        }
+        // No update was detected (SW script is byte-identical to what's
+        // already controlling this page). Force-clear ALL caches anyway as
+        // belt-and-suspenders and reload — covers the case where the SW is
+        // fine but a stale asset is still being served from CacheStorage
+        // (e.g. a previous PWA session with a corrupted entry).
+        if ('caches' in self) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        flashRouteMessage('✅ Already up to date. Reloading to clear stale caches…', 2500);
+        setTimeout(() => location.reload(), 800);
+      } catch (e) {
+        flashRouteMessage(`⚠ Update check failed (${e.message || e}). Hard-refreshing.`, 4000);
+        setTimeout(() => location.reload(), 1200);
+      }
+    };
+
+    async function _resetAppDataImpl() {
+      // localStorage.clear() is origin-scoped — it ONLY removes this site's
+      // entries, never anything stored under any other origin. Same for
+      // caches.delete() and registration.unregister(). This is the platform
+      // guarantee that makes "Reset app data" safe to ship.
+      try { localStorage.clear(); } catch (e) {}
+      try {
+        if ('caches' in self) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+      } catch (e) {}
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+      } catch (e) {}
+      flashRouteMessage('🧹 Cleared all Winni Nav data on this phone. Reloading…', 2500);
+      setTimeout(() => location.reload(), 800);
+    }
+
+    window.confirmResetAppData = function() {
+      // window.confirm() instead of the styled modal stack because:
+      // (a) it's a destructive action and deserves OS-level friction,
+      // (b) it works identically on mobile + desktop without new UI,
+      // (c) it explicitly states the origin-scope guarantee, which is the
+      //     exact point of confusion we want to address for Tyler.
+      const ok = window.confirm(
+        'Reset ALL Winni Nav data on this phone?\n\n' +
+        'This clears (only on this site):\n' +
+        '  • Trips, buoys, hazards, POIs, depth soundings\n' +
+        '  • Routes you drew + shipped routes cache\n' +
+        '  • Your vessel icon choice + layer toggle state\n' +
+        '  • Offline app shell (service-worker cache)\n\n' +
+        'Other websites and tabs are NOT touched — localStorage and\n' +
+        'CacheStorage are origin-scoped by the browser.\n\n' +
+        'To restore from a backup afterwards: 🛶 → 📥 Import GPX\n' +
+        '(trips) or re-import the 💾 JSON (all layers).\n\n' +
+        'Continue?'
+      );
+      if (ok) _resetAppDataImpl();
+    };
+
     function exportLandingData() { openApp({fromLanding:true}); setTimeout(() => document.getElementById('exportBtn').click(), 200); }
     function showPrivacy() {
       const modal = document.getElementById('modal');
