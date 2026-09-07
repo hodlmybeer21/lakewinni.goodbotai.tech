@@ -5909,6 +5909,170 @@ ${tracks}
       URL.revokeObjectURL(url);
     };
 
+    // ----- Trip import (GPX) -----
+    // Restores trips from a previously exported GPX file (single-trip or
+    // "Export all" multi-track). Both Winni Nav export formats and any
+    // standard-conformant GPX 1.1 file (Google Earth / Garmin / Strava /
+    // etc.) are accepted. Speed (<speed>) is GPX-standard m/s and gets
+    // converted back to knots; <course> is degrees true (matches our
+    // headingDeg shape). Trips dedupe on (name + first/last point coords
+    // rounded to ~11 m) so re-importing the same file is a no-op, but two
+    // trips with the same name on a different route still import cleanly.
+    // Stored trips get a fresh `id` (GPX doesn't carry one) and keep the
+    // original `started` timestamp from <metadata><time> or the first
+    // point's <time>.
+    function parseGpxToTrips(text) {
+      const doc = new DOMParser().parseFromString(text, 'application/xml');
+      if (doc.querySelector('parsererror')) {
+        throw new Error('Not a valid GPX file');
+      }
+      const tripEls = doc.getElementsByTagName('trk');
+      const metaNameEl = doc.querySelector('metadata > name');
+      const metaName = metaNameEl ? metaNameEl.textContent.trim() : '';
+      const metaTimeEl = doc.querySelector('metadata > time');
+      const metaTime = metaTimeEl ? metaTimeEl.textContent.trim() : '';
+      const trips = [];
+      for (let i = 0; i < tripEls.length; i++) {
+        const trk = tripEls[i];
+        // Name: prefer <trk><name>, fall back to <metadata><name> when there's
+        // only one track in the file, otherwise generate a dated default.
+        let name = '';
+        const trkNameEl = trk.getElementsByTagName('name')[0];
+        if (trkNameEl) name = trkNameEl.textContent.trim();
+        if (!name && tripEls.length === 1 && metaName) name = metaName;
+        if (!name) {
+          const d = new Date();
+          name = `Imported trip ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+        }
+        // <trkseg><trkpt lat lon> — one point per segment is rare but valid;
+        // getElementsByTagName flattens across <trkseg>s which is what we want.
+        const trkpts = trk.getElementsByTagName('trkpt');
+        const points = [];
+        let firstPointTime = '';
+        for (let j = 0; j < trkpts.length; j++) {
+          const tp = trkpts[j];
+          const lat = parseFloat(tp.getAttribute('lat'));
+          const lng = parseFloat(tp.getAttribute('lon'));
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+          const tEl = tp.getElementsByTagName('time')[0];
+          const ptTime = tEl ? tEl.textContent.trim() : '';
+          if (j === 0 && ptTime) firstPointTime = ptTime;
+          const speedEl = tp.getElementsByTagName('speed')[0];
+          let speedKn = null;
+          if (speedEl) {
+            const mps = parseFloat(speedEl.textContent);
+            if (Number.isFinite(mps)) speedKn = mps / 0.514444; // m/s → kn
+          }
+          const courseEl = tp.getElementsByTagName('course')[0];
+          let headingDeg = null;
+          if (courseEl) {
+            const c = parseFloat(courseEl.textContent);
+            if (Number.isFinite(c)) headingDeg = c;
+          }
+          // Always give each point a timestamp so tripDurationMin works and
+          // the GPX export round-trips cleanly later. Fall back to ISO now()
+          // only when the source GPX omits every <time>.
+          points.push({
+            t: ptTime || points[points.length - 1]?.t || new Date().toISOString(),
+            lat, lng, speedKn, headingDeg,
+          });
+        }
+        if (points.length < 2) continue; // degenerate — skip
+        // <metadata><time> applies to the whole file; only use it as `started`
+        // when there is exactly one track, otherwise per-track first-point
+        // timestamps are more accurate.
+        let started = (tripEls.length === 1 && metaTime) ? metaTime : firstPointTime;
+        if (!started) started = points[0].t;
+        trips.push({ name, started, points });
+      }
+      return trips;
+    }
+
+    function makeTripId() {
+      // Same shape as startNewTrip() so a re-imported trip is indistinguishable
+      // from a freshly recorded one in localStorage and downstream code paths.
+      return 't' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+    }
+
+    function tripFingerprint(trip) {
+      // name + first + last point rounded to ~11 m. Two trips with the same
+      // route and name collapse to one fingerprint even if their internal ids
+      // or timestamps differ — exactly the re-import scenario we care about.
+      const first = trip.points[0];
+      const last = trip.points[trip.points.length - 1];
+      return [
+        trip.name,
+        first.lat.toFixed(4) + ',' + first.lng.toFixed(4),
+        last.lat.toFixed(4)  + ',' + last.lng.toFixed(4),
+      ].join('|');
+    }
+
+    window.importTripsFromGpxText = function(text) {
+      let incoming;
+      try {
+        incoming = parseGpxToTrips(text);
+      } catch (e) {
+        flashRouteMessage("⚠ Couldn't read that file — not a valid GPX", 3500);
+        return;
+      }
+      if (incoming.length === 0) {
+        flashRouteMessage('⚠ No trips found in that GPX (need ≥2 points per track)', 3500);
+        return;
+      }
+      const existingFp = new Set(storedTrips.map(tripFingerprint));
+      let added = 0, skipped = 0;
+      for (const trip of incoming) {
+        const fp = tripFingerprint(trip);
+        if (existingFp.has(fp)) { skipped++; continue; }
+        existingFp.add(fp); // block duplicates within the same import file too
+        const stored = Object.assign({}, trip, { id: makeTripId() });
+        storedTrips.push(stored);
+        addTripToLayer(stored);
+        added++;
+      }
+      if (added > 0) {
+        saveTrips();
+        // Auto-enable the Trips layer so the freshly imported lines show up.
+        const cb = document.getElementById('layerTrips');
+        if (cb && !cb.checked) {
+          cb.checked = true;
+          if (layers.trips) layers.trips.addTo(map);
+        }
+      }
+      const bits = [];
+      if (added)   bits.push(`${added} added`);
+      if (skipped) bits.push(`${skipped} already there`);
+      const verb = added ? '📥 Imported' : 'ℹ Nothing new';
+      flashRouteMessage(`${verb} — ${bits.join(' · ') || 'file was empty'}`, 4000);
+      // Refresh the modal so the user sees the new rows (and the new totals).
+      showTripsModal();
+    };
+
+    window.handleTripImportFile = function(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          window.importTripsFromGpxText(String(e.target.result));
+        } catch (err) {
+          flashRouteMessage(`⚠ Import failed: ${err.message || err}`, 3500);
+        }
+        // Reset so importing the same file twice in a row works (the browser
+        // suppresses change events when the same filename is selected again).
+        input.value = '';
+      };
+      reader.onerror = () => {
+        flashRouteMessage("⚠ Couldn't read file", 3000);
+        input.value = '';
+      };
+      reader.readAsText(file);
+    };
+
+    window.openTripImportPicker = function() {
+      document.getElementById('tripImportFile').click();
+    };
+
     // ----- GPS follow / lock-on-boat -----
     //
     // When GPS is on, follow mode auto-pans the map to the boat's
@@ -6484,8 +6648,15 @@ ${tracks}
             Tap <strong>Start GPS</strong> to begin recording a trip.
             The trip will auto-save when you tap Stop GPS, and you'll get to name it.
           </p>
+          <p style="font-size:12px;color:#666;">
+            Or restore a previously exported GPX file (single trip or the
+            <em>Export all (GPX)</em> bundle from this modal).
+          </p>
         `;
-        actions.innerHTML = `<button class="btn btn-primary" onclick="cancelModal()">Close</button>`;
+        actions.innerHTML = `
+          <button class="btn btn-secondary" onclick="cancelModal()">Close</button>
+          <button class="btn btn-primary" onclick="openTripImportPicker()">📥 Import GPX…</button>
+        `;
       } else {
         const totalKm = storedTrips.reduce((s, t) => s + tripDistanceKm(t), 0);
         const totalMin = storedTrips.reduce((s, t) => s + tripDurationMin(t), 0);
@@ -6522,6 +6693,7 @@ ${tracks}
         `;
         actions.innerHTML = `
           <button class="btn btn-secondary" onclick="cancelModal()">Close</button>
+          <button class="btn btn-secondary" onclick="openTripImportPicker()">📥 Import GPX…</button>
           ${storedTrips.length > 0 ? `<button class="btn btn-primary" onclick="exportAllTripsGPX()">Export all (GPX)</button>` : ''}
         `;
       }
@@ -6706,7 +6878,8 @@ ${tracks}
             <strong>Shipped recommended routes:</strong> ${(getCachedShippedRoutes() || []).length} (cached locally).<br>
             <strong>Marinas in directory:</strong> ${MARINAS.length} (static reference data).<br>
             <strong>Bridges & clearance:</strong> ${BRIDGES.length} (off by default).<br>
-            Use 💾 to export your data as JSON, or 🛶 to export trips as GPX.
+            Use 💾 to export your data as JSON, or 🛶 to export trips as GPX.<br>
+            To restore after a browser reset: 🛶 → <strong>📥 Import GPX…</strong> (trips) or re-import the 💾 JSON (all layers).
           </p>
           <p style="font-size:12px;color:#666;margin-top:12px;">
             <a href="#" onclick="resetSafetyDisclaimer(); cancelModal(); return false;">🔄 Re-show safety disclaimer</a>
@@ -7124,7 +7297,8 @@ ${tracks}
           <strong>Shipped recommended routes:</strong> ${(typeof getCachedShippedRoutes === 'function' ? (getCachedShippedRoutes() || []) : []).length} (cached locally).<br>
           <strong>Marinas in directory:</strong> ${typeof MARINAS !== 'undefined' ? MARINAS.length : 0} (static reference data).<br>
           <strong>Bridges &amp; clearance:</strong> ${typeof BRIDGES !== 'undefined' ? BRIDGES.length : 0} (off by default).<br>
-          Use 💾 to export your data as JSON, or 🛶 to export trips as GPX.
+          Use 💾 to export your data as JSON, or 🛶 to export trips as GPX.<br>
+          To restore after a browser reset: 🛶 → <strong>📥 Import GPX…</strong> (trips) or re-import the 💾 JSON (all layers).
         </p>
         <p style="font-size:12px;color:#666;margin-top:12px;">
           <a href="#" onclick="resetSafetyDisclaimer(); cancelModal(); return false;">🔄 Re-show safety disclaimer</a>
@@ -7261,5 +7435,16 @@ ${tracks}
       if (typeof window.syncFabTrip === 'function') window.syncFabTrip();
     });
   </script>
+
+  <!-- Hidden file input for the Trips → 📥 Import GPX flow. Triggered
+       imperatively by openTripImportPicker() so the visible button can sit
+       inside modal action rows and stay keyboard-accessible. Hidden, not
+       removed, so `<input type="file">`'s built-in security model still
+       applies (the user must grant per-file access from a picker). -->
+  <input type="file"
+         id="tripImportFile"
+         accept=".gpx,application/gpx+xml,application/xml,text/xml"
+         style="display:none"
+         onchange="handleTripImportFile(this)" />
 </body>
 </html>

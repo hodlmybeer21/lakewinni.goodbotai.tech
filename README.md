@@ -74,6 +74,10 @@ Buoys are circles (red nun / green can / white / yellow), hazards are red triang
 
 Tap **Start GPS** to begin a trip. A teal dotted line trails behind your boat as you move. When you tap **Stop GPS**, the trip auto-saves and a popup asks for a name. Past trips are visible (toggleable via the Trips layer) and can be exported as GPX from the 🛶 Trips modal — individually or all-at-once.
 
+## Trip import (GPX)
+
+Cleared your browser history and lost your trips? Tap **🛶 → 📥 Import GPX…** to restore them from a previously exported file. Accepts both the single-trip `Export GPX` and the bundled `Export all (GPX)` formats produced by this app, plus any standard GPX 1.1 file (Google Earth, Garmin BaseCamp, Strava, etc.). Imported trips are deduped by `name + first/last point` so re-importing the same file is a no-op, but multiple distinct trips import cleanly. Each gets a fresh internal id and the original `started` timestamp from the GPX `<metadata><time>`. Speed (`<speed>`, m/s) is converted back to knots for matching the rest of the app.
+
 ## NH GRANIT bathymetry (reference)
 
 Toggle **NH Bathymetry** in the layer panel. While on, a yellow disclaimer banner stays visible: *"NH Bathymetry (NH GRANIT/NHDES) — reference only, NOT for navigation. Verify on an authoritative cruising chart."* The NHDES license says exactly this — we surface it.
@@ -107,7 +111,8 @@ Data is fetched once from NH GRANIT/NHDES feature services and cached in localSt
 - [x] **v1.4** — Bridge clearance markers + live clearance calculator (USGS lake level + standard full-lake reference formula) ✅ shipped 2026-07-07
 - [x] **v1.5** — POI layer (restaurants / hotels / groceries) + marina directory expansion (directory-seeded) ✅ shipped 2026-07-07
 - [x] **v1.6** — Shipped recommended routes (orange) under the existing Routes toggle; click for label + GPX export + "Route to start" via Google Maps. Twelve routes shipped as of 2026-07-10 (5 cross-lake + 7 island). ✅ shipped 2026-07-10
-- [ ] **v1.7** — Weather overlay (NOAA station at Wolfeboro)
+- [x] **v1.7** — Trip import (GPX, 🛶 Trips modal) ✅ shipped 2026-09-07
+- [ ] **v1.8** — Weather overlay (NOAA station at Wolfeboro)
 - [ ] **v2.0** — Multi-user live tracking (backend, friends can see each other)
 
 ## License
