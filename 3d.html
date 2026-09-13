@@ -807,7 +807,17 @@
 
       if (holeCount === 0) return null;
 
-      const landGeo = new THREE.ShapeGeometry(outer);
+      // Use ExtrudeGeometry instead of ShapeGeometry. Both call the same
+      // earcut-based ShapeUtils.triangulateShape, but ExtrudeGeometry has
+      // more robust handling for complex polygons with many holes (the OSM
+      // lake has 12,435 vertices in the outer ring). ExtrudeGeometry extrudes
+      // the shape (outer square minus lake hole) into a thin 3D slab; we
+      // rotate it flat and sit the top face at y=0.3 (matching the original
+      // ShapeGeometry flat plane height).
+      const landGeo = new THREE.ExtrudeGeometry(outer, {
+        depth: 0.3,
+        bevelEnabled: false,
+      });
       landGeo.rotateX(-Math.PI / 2);
       landGeo.computeVertexNormals();
 
@@ -816,7 +826,7 @@
       });
 
       const land = new THREE.Mesh(landGeo, landMat);
-      land.position.y = 0.3;
+      land.position.y = 0;  // top face sits at y=0.3 (extrude depth)
       return land;
     }
 
@@ -845,13 +855,13 @@
           if (gj.type === 'Polygon') coords = [gj.coordinates[0]];
           else if (gj.type === 'MultiPolygon') coords = gj.coordinates;
           if (!coords.length) throw new Error('No polygon coords');
-          // Simplify: every 4th vertex (~3100 pts for Lake Winnipesaukee)
-          const simplifiedRing = coords[0][0].filter((_, i) => i % 4 === 0);
+          // Store the full OSM polygon — ExtrudeGeometry handles complex
+          // polygons with thousands of vertices robustly via ShapeUtils.
           const fc = {
             type: 'FeatureCollection',
             features: [{
               type: 'Feature',
-              geometry: { type: 'Polygon', coordinates: [simplifiedRing] },
+              geometry: { type: 'Polygon', coordinates: [coords[0][0]] },
               properties: { source: 'nominatim.openstreetmap.org' },
             }],
           };
