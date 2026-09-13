@@ -621,7 +621,12 @@
       });
       const skyMesh = new THREE.Mesh(skyGeo, skyMat);
       skyMesh.renderOrder = -1; // draw first, before everything else
+      skyMesh.frustumCulled = false; // always render — we'll move it to follow camera
       scene.add(skyMesh);
+      // Sky will be repositioned each frame to follow the camera (in animate()).
+      // Without this, the boat can travel outside the sphere and the sky
+      // disappears. With follow, the sky is always around the viewer.
+      window._skyMesh = skyMesh;
     }
     scene.fog = new THREE.Fog(0xb8d4e8, 600, 2500);
 
@@ -640,7 +645,10 @@
     // WATER — animated plane with vertex displacement
     // =====================================================================
 
-    const WATER_SIZE = 4000; // meters
+    // Lake spans ~29 km N-S and ~22 km E-W around the centroid. Use a plane
+    // large enough to cover it (well past the fog far plane) so the user
+    // never sees the water edge, no matter where on the lake they are.
+    const WATER_SIZE = 30000; // meters (half-extent)
     const WATER_SEG = 96;
     const waterGeo = new THREE.PlaneGeometry(WATER_SIZE, WATER_SIZE, WATER_SEG, WATER_SEG);
     waterGeo.rotateX(-Math.PI / 2);
@@ -1041,6 +1049,12 @@
     function animate() {
       requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
+
+      // Keep the sky sphere centered on the camera so it's always around the
+      // viewer, no matter where on the lake the boat has traveled.
+      if (window._skyMesh) {
+        window._skyMesh.position.copy(camera.position);
+      }
 
       // Animate water
       updateWater(t);
