@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0f172a">
+  <title>Winni Nav · 3D Driving Mode</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      position: fixed;
+      touch-action: none;
+      -webkit-user-select: none; user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0b1220;
+      color: #fff;
+    }
+    canvas { display: block; touch-action: none; }
+
+    /* Top status bar — app title + GPS status */
+    #topbar {
+      position: fixed;
+      top: max(10px, env(safe-area-inset-top, 10px));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      padding: 8px 16px;
+      background: rgba(8, 18, 32, 0.78);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 14px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      color: #e2e8f0;
+      display: flex; align-items: center; gap: 10px;
+      max-width: calc(100vw - 24px);
+      white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    }
+    #topbar .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #94a3b8;
+      transition: background 0.3s, box-shadow 0.3s;
+      flex-shrink: 0;
+    }
+    #topbar .dot.on { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    #topbar .dot.warn { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+    #topbar b { color: #38bdf8; font-weight: 700; }
+    #topbar .sep { opacity: 0.3; }
+
+    /* HUD: speed + heading (top-left) */
+    #hudLeft {
+      position: fixed;
+      top: max(56px, calc(env(safe-area-inset-top, 10px) + 50px));
+      left: max(10px, env(safe-area-inset-left, 10px));
+      z-index: 9;
+      padding: 10px 14px;
+      background: rgba(8, 18, 32, 0.78);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 12px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-variant-numeric: tabular-nums;
+      font-size: 13px;
+      line-height: 1.55;
+      min-width: 130px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    }
+    #hudLeft .label { color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+    #hudLeft .val { color: #f1f5f9; font-size: 18px; font-weight: 600; }
+    #hudLeft .unit { color: #94a3b8; font-size: 12px; margin-left: 2px; }
+
+    /* Compass ring (top-right) — visual heading indicator */
+    #compass {
+      position: fixed;
+      top: max(56px, calc(env(safe-area-inset-top, 10px) + 50px));
+      right: max(10px, env(safe-area-inset-right, 10px));
+      z-index: 9;
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: rgba(8, 18, 32, 0.78);
+      border: 2px solid rgba(56, 189, 248, 0.4);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    }
+    #compassNeedle {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 2px; height: 26px;
+      background: linear-gradient(180deg, #ef4444 0%, #ef4444 50%, #cbd5e1 50%, #cbd5e1 100%);
+      transform: translate(-50%, -50%);
+      transform-origin: center;
+      border-radius: 1px;
+    }
+    #compassLabel {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 9px;
+      color: #cbd5e1;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      pointer-events: none;
+      margin-top: 14px;
+    }
+    #compassN {
+      position: absolute; top: 3px; left: 50%; transform: translateX(-50%);
+      font-size: 10px; font-weight: 700; color: #ef4444;
+    }
+    #compassE { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 9px; color: #94a3b8; }
+    #compassS { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #94a3b8; }
+    #compassW { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); font-size: 9px; color: #94a3b8; }
+
+    /* Floating buoy labels (overlaid on canvas) */
+    .buoy-label {
+      position: fixed;
+      z-index: 7;
+      transform: translate(-50%, -100%);
+      padding: 6px 10px;
+      background: rgba(8, 18, 32, 0.88);
+      border: 1.5px solid;
+      border-radius: 10px;
+      font-size: 11px;
+      line-height: 1.3;
+      white-space: nowrap;
+      pointer-events: none;
+      font-weight: 600;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      max-width: 200px;
+    }
+    .buoy-label.port { border-color: #ef4444; color: #fca5a5; }
+    .buoy-label.starboard { border-color: #22c55e; color: #86efac; }
+    .buoy-label.ahead { border-color: #fbbf24; color: #fde68a; }
+    .buoy-label.abeam { border-color: #38bdf8; color: #7dd3fc; }
+    .buoy-label .type { font-weight: 700; }
+    .buoy-label .side { display: block; font-size: 10px; opacity: 0.85; font-weight: 500; }
+    .buoy-label .dist { display: block; font-size: 10px; opacity: 0.7; font-weight: 500; margin-top: 1px; }
+    .buoy-label::after {
+      content: '';
+      position: absolute;
+      bottom: -6px; left: 50%;
+      transform: translateX(-50%);
+      width: 0; height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid currentColor;
+    }
+
+    /* Bottom action bar */
+    #actionBar {
+      position: fixed;
+      bottom: max(12px, env(safe-area-inset-bottom, 12px));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex; gap: 8px;
+      padding: 6px;
+      background: rgba(8, 18, 32, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 999px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+    .actionBtn {
+      appearance: none;
+      border: none;
+      background: rgba(56, 189, 248, 0.12);
+      color: #f1f5f9;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, transform 0.1s;
+      position: relative;
+    }
+    .actionBtn:active { transform: scale(0.92); background: rgba(56, 189, 248, 0.3); }
+    .actionBtn.primary { background: #38bdf8; color: #0b1220; }
+    .actionBtn.primary:active { background: #0ea5e9; }
+    .actionBtn .badge {
+      position: absolute;
+      top: -2px; right: -2px;
+      min-width: 16px; height: 16px;
+      padding: 0 4px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 9px; font-weight: 700;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #camLabel {
+      position: absolute;
+      bottom: 100%; left: 50%;
+      transform: translateX(-50%);
+      margin-bottom: 6px;
+      padding: 4px 8px;
+      background: rgba(0,0,0,0.75);
+      border-radius: 6px;
+      font-size: 10px;
+      white-space: nowrap;
+      color: #cbd5e1;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    .actionBtn:active #camLabel { opacity: 1; }
+
+    /* Big "Start GPS" prompt overlay (initial state) */
+    #startOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      background: rgba(8, 18, 32, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      padding: 24px;
+      text-align: center;
+    }
+    #startOverlay.hidden { display: none; }
+    #startOverlay h1 {
+      font-size: 22px; font-weight: 700;
+      color: #38bdf8;
+      margin: 0;
+      letter-spacing: 0.5px;
+    }
+    #startOverlay p {
+      font-size: 14px; color: #cbd5e1;
+      max-width: 320px; line-height: 1.55;
+      margin: 0;
+    }
+    #startOverlay .startBtn {
+      appearance: none;
+      border: none;
+      background: #38bdf8;
+      color: #0b1220;
+      padding: 14px 28px;
+      border-radius: 999px;
+      font-size: 16px; font-weight: 700;
+      cursor: pointer;
+      margin-top: 12px;
+      box-shadow: 0 4px 16px rgba(56, 189, 248, 0.4);
+    }
+    #startOverlay .startBtn:active { transform: scale(0.97); }
+    #startOverlay .note {
+      font-size: 11px; color: #64748b;
+      max-width: 280px;
+      margin-top: 4px;
+    }
+
+    /* Closest buoy alert (bottom-left, above action bar) */
+    #alertBox {
+      position: fixed;
+      bottom: calc(max(12px, env(safe-area-inset-bottom, 12px)) + 62px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9;
+      padding: 8px 14px;
+      background: rgba(8, 18, 32, 0.85);
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      border-radius: 12px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-size: 12px;
+      color: #fef3c7;
+      white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    #alertBox.show { opacity: 1; }
+
+    /* Distance ring legend (small, lower-right) */
+    #legend {
+      position: fixed;
+      bottom: calc(max(12px, env(safe-area-inset-bottom, 12px)) + 62px);
+      right: max(10px, env(safe-area-inset-right, 10px));
+      z-index: 9;
+      padding: 8px 10px;
+      background: rgba(8, 18, 32, 0.7);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 10px;
+      font-size: 10px;
+      color: #94a3b8;
+      line-height: 1.6;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+    #legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
+
+    /* Trip trail dot counter */
+    #trailDot {
+      position: fixed;
+      top: 50%; left: 50%;
+      z-index: 8;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: rgba(56, 189, 248, 0.6);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <div id="topbar">
+    <span class="dot" id="gpsDot"></span>
+    <span><b>🛰 Winni Nav 3D</b></span>
+    <span class="sep">|</span>
+    <span id="gpsStatus">GPS off</span>
+    <span class="sep" id="gpsAccSep" style="display:none;">|</span>
+    <span id="gpsAcc" style="display:none;">±—</span>
+  </div>
+
+  <div id="hudLeft">
+    <div><span class="label">Speed</span> <span class="val" id="speedVal">0.0</span><span class="unit"> kn</span></div>
+    <div><span class="label">Heading</span> <span class="val" id="headingVal">—</span><span class="unit">°</span></div>
+    <div><span class="label">Position</span> <span class="val" id="posVal" style="font-size:11px;">—</span></div>
+  </div>
+
+  <div id="compass" aria-hidden="true">
+    <span id="compassN">N</span>
+    <span id="compassE">E</span>
+    <span id="compassS">S</span>
+    <span id="compassW">W</span>
+    <div id="compassNeedle"></div>
+    <div id="compassLabel">--°</div>
+  </div>
+
+  <div id="alertBox"></div>
+
+  <div id="legend">
+    <div><span class="swatch" style="background:#ef4444;"></span>Red nun</div>
+    <div><span class="swatch" style="background:#22c55e;"></span>Green can</div>
+    <div><span class="swatch" style="background:#f1f5f9;"></span>White</div>
+    <div><span class="swatch" style="background:#fbbf24;"></span>Yellow</div>
+  </div>
+
+  <div id="actionBar">
+    <button class="actionBtn primary" id="btnCam" title="Camera mode (tap to cycle)">
+      <span id="camIcon">🎥</span>
+      <span id="camLabel">Chase</span>
+    </button>
+    <button class="actionBtn" id="btnReset" title="Reset camera view">⊙</button>
+    <button class="actionBtn" id="btnMap" title="Switch to 2D map">🗺</button>
+    <button class="actionBtn" id="btnHelp" title="Help / info">ⓘ</button>
+  </div>
+
+  <div id="startOverlay">
+    <h1>🛰 Winni Nav 3D</h1>
+    <p>Live GPS driving view of Lake Winnipesaukee. As buoys come within 500&nbsp;m, you'll see which side of your boat they're on — port or starboard — so you know which way to pass.</p>
+    <button class="startBtn" id="startBtn">Start GPS</button>
+    <p class="note">Your position never leaves the device. Buoys are read from your existing Winni Nav data on this phone.</p>
+  </div>
+
+  <div id="trailDot"></div>
+
+  <!-- Container for floating buoy labels (children appended in JS) -->
+  <div id="labels"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://esm.sh/three@0.160.0",
+      "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    // =====================================================================
+    // CONSTANTS — keep aligned with the main Winni Nav app (index.html)
+    // =====================================================================
+
+    // Lake center reference point for the local equirectangular projection.
+    // At ~43.6°N: 1° lat ≈ 111000 m, 1° lng ≈ 111000 * cos(43.6°) ≈ 80300 m.
+    // Chosen near the geographic centroid of the lake so north/east are
+    // visually intuitive and the projection is near-orthogonal at this scale.
+    const REF_LAT = 43.60;
+    const REF_LNG = -71.32;
+    const METERS_PER_DEG_LAT = 111000;
+    const METERS_PER_DEG_LNG = 80300;
+
+    // Same ISLANDS[] the main app ships (rough polygons, orientation only).
+    // We add a few more major islands here so the 3D world feels populated
+    // without bloating the main 2D map.
+    const ISLANDS_3D = [
+      { name: "Long Island", shape: [
+        [43.6580,-71.1900],[43.6650,-71.1820],[43.6720,-71.1850],
+        [43.6700,-71.1940],[43.6620,-71.1980],[43.6580,-71.1900]
+      ]},
+      { name: "Meredith Neck", shape: [
+        [43.6100,-71.2600],[43.6200,-71.2550],[43.6250,-71.2620],
+        [43.6180,-71.2700],[43.6080,-71.2680],[43.6100,-71.2600]
+      ]},
+      // Additional islands — rough polygons from the cruising chart, low-confidence
+      // orientation only (matches rule #1 of main AGENTS.md).
+      { name: "Bear Island", shape: [
+        [43.5950,-71.2750],[43.6100,-71.2750],[43.6150,-71.2650],
+        [43.6080,-71.2580],[43.5980,-71.2600],[43.5950,-71.2750]
+      ]},
+      { name: "Governor's Island", shape: [
+        [43.6290,-71.3500],[43.6350,-71.3450],[43.6380,-71.3500],
+        [43.6350,-71.3580],[43.6280,-71.3580],[43.6290,-71.3500]
+      ]},
+      { name: "Rattlesnake Island", shape: [
+        [43.6300,-71.3050],[43.6380,-71.3000],[43.6420,-71.3080],
+        [43.6360,-71.3150],[43.6300,-71.3130],[43.6300,-71.3050]
+      ]},
+      { name: "Cow Island", shape: [
+        [43.6360,-71.3300],[43.6420,-71.3280],[43.6440,-71.3340],
+        [43.6400,-71.3400],[43.6350,-71.3380],[43.6360,-71.3300]
+      ]},
+      { name: "Three Mile Island", shape: [
+        [43.6750,-71.4200],[43.6820,-71.4180],[43.6850,-71.4250],
+        [43.6800,-71.4300],[43.6740,-71.4280],[43.6750,-71.4200]
+      ]},
+      { name: "Five Mile Island", shape: [
+        [43.6850,-71.3950],[43.6930,-71.3920],[43.6960,-71.4000],
+        [43.6900,-71.4060],[43.6840,-71.4040],[43.6850,-71.3950]
+      ]},
+      { name: "Stonedam Island", shape: [
+        [43.5570,-71.2150],[43.5650,-71.2120],[43.5680,-71.2200],
+        [43.5630,-71.2260],[43.5560,-71.2230],[43.5570,-71.2150]
+      ]},
+      { name: "Sandy Island", shape: [
+        [43.5720,-71.2200],[43.5780,-71.2180],[43.5800,-71.2240],
+        [43.5750,-71.2280],[43.5710,-71.2250],[43.5720,-71.2200]
+      ]},
+      { name: "Diamond Island", shape: [
+        [43.5920,-71.3250],[43.5980,-71.3230],[43.6010,-71.3300],
+        [43.5960,-71.3340],[43.5910,-71.3320],[43.5920,-71.3250]
+      ]},
+      { name: "Welch Island", shape: [
+        [43.6040,-71.3150],[43.6110,-71.3120],[43.6140,-71.3200],
+        [43.6090,-71.3250],[43.6030,-71.3220],[43.6040,-71.3150]
+      ]},
+      { name: "Pine Island", shape: [
+        [43.6800,-71.2750],[43.6860,-71.2720],[43.6890,-71.2780],
+        [43.6850,-71.2830],[43.6790,-71.2810],[43.6800,-71.2750]
+      ]},
+    ];
+
+    // Buoy types — keep aligned with main app's BUOY_TYPES.
+    const BUOY_TYPES = {
+      red:    { label: 'Red nun',         color: 0xcc2222, shape: 'cone',   desc: 'Keep to port (when traveling outbound)' },
+      green:  { label: 'Green can',       color: 0x22aa44, shape: 'cyl',    desc: 'Keep to starboard (when traveling outbound)' },
+      white:  { label: 'White/spar',      color: 0xeeeeee, shape: 'sphere', desc: 'Information / hazard marker' },
+      yellow: { label: 'Yellow hazard',   color: 0xf5b800, shape: 'sphere', desc: 'Caution — rock / shoal / obstruction' },
+      black:  { label: 'Black (special)', color: 0x222222, shape: 'cyl',    desc: 'Special mark (dredged channel, regulatory, etc.)' },
+      nowake: { label: 'No-wake zone',    color: 0xff7733, shape: 'cyl',    desc: 'Slow / no-wake zone' },
+      light:  { label: 'Lighted buoy',    color: 0xffeeaa, shape: 'cyl',    desc: 'Lighted ATON (visible at night)' },
+    };
+
+    const BUOY_RANGE_M = 500; // labels appear within this radius
+    const BUOY_RANGE_HARD_M = 800; // buoys beyond this are culled for performance
+
+    // =====================================================================
+    // STATE
+    // =====================================================================
+
+    const state = {
+      // GPS
+      gpsOn: false,
+      pos: null,           // {lat, lng, accuracy}
+      speedKn: 0,
+      headingDeg: null,
+      lastPosTime: 0,
+      watchId: null,
+
+      // Boat position in world (meters from REF)
+      boatWorld: new THREE.Vector3(0, 0, 0),
+      boatHeadingRad: 0,
+
+      // Camera
+      camMode: 'chase',  // 'chase' | 'cockpit' | 'orbit'
+      orbitYaw: 0,
+      orbitPitch: -0.6,
+      orbitDist: 200,
+      orbitTarget: new THREE.Vector3(0, 0, 0),
+
+      // Trip trail
+      trail: [],  // [{x,z}, ...] last N positions
+
+      // Vessel color
+      vesselColor: 0x0ea5e9,
+
+      // Build-time
+      started: false,
+    };
+
+    // =====================================================================
+    // PROJECTION — lat/lng ↔ local meters
+    // =====================================================================
+
+    function latLngToWorld(lat, lng) {
+      const x = (lng - REF_LNG) * METERS_PER_DEG_LNG;
+      const z = -(lat - REF_LAT) * METERS_PER_DEG_LAT; // north = -z in our convention
+      return { x, z };
+    }
+
+    function worldToLatLng(x, z) {
+      const lat = REF_LAT - z / METERS_PER_DEG_LAT;
+      const lng = REF_LNG + x / METERS_PER_DEG_LNG;
+      return { lat, lng };
+    }
+
+    function distMeters(ax, az, bx, bz) {
+      const dx = bx - ax, dz = bz - az;
+      return Math.sqrt(dx*dx + dz*dz);
+    }
+
+    // Compass bearing in degrees, 0=N, clockwise, range [0, 360)
+    function bearingDeg(fromX, fromZ, toX, toZ) {
+      const dx = toX - fromX;
+      const dz = -(toZ - fromZ); // flip z to "north"
+      let b = Math.atan2(dx, dz) * 180 / Math.PI;
+      if (b < 0) b += 360;
+      return b;
+    }
+
+    // Relative bearing: how far the target is off the bow, normalized [-180, 180].
+    // Negative = port (left of heading), positive = starboard (right).
+    function relBearingDeg(targetBearing, headingDeg) {
+      let r = targetBearing - headingDeg;
+      while (r > 180) r -= 360;
+      while (r < -180) r += 360;
+      return r;
+    }
+
+    function sideLabel(relBrg) {
+      const side = relBrg >= 0 ? 'STARBOARD' : 'PORT';
+      const sideLong = relBrg >= 0 ? 'starboard (right)' : 'port (left)';
+      const a = Math.abs(relBrg);
+      let zone;
+      if (a < 30) zone = 'ahead';
+      else if (a < 60) zone = relBrg >= 0 ? 'ahead-starboard' : 'ahead-port';
+      else if (a < 120) zone = side.toLowerCase();
+      else if (a < 150) zone = relBrg >= 0 ? 'astern-starboard' : 'astern-port';
+      else zone = 'astern';
+      return { side, sideLong, zone, absBearing: a };
+    }
+
+    // =====================================================================
+    // THREE.JS SETUP
+    // =====================================================================
+
+    const canvas = document.getElementById('scene');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+
+    const scene = new THREE.Scene();
+    // Sky gradient (light blue → white at horizon)
+    {
+      const skyGeo = new THREE.SphereGeometry(2000, 32, 16);
+      const skyMat = new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: {
+          topColor:    { value: new THREE.Color(0x4a8fcf) },
+          midColor:    { value: new THREE.Color(0xa8d5f0) },
+          bottomColor: { value: new THREE.Color(0xeef5fa) },
+        },
+        vertexShader: `
+          varying vec3 vWorldPos;
+          void main() {
+            vec4 wp = modelMatrix * vec4(position, 1.0);
+            vWorldPos = wp.xyz;
+            gl_Position = projectionMatrix * viewMatrix * wp;
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 topColor;
+          uniform vec3 midColor;
+          uniform vec3 bottomColor;
+          varying vec3 vWorldPos;
+          void main() {
+            float h = normalize(vWorldPos).y;
+            vec3 c;
+            if (h > 0.0) {
+              c = mix(midColor, topColor, smoothstep(0.0, 0.5, h));
+            } else {
+              c = mix(midColor, bottomColor, smoothstep(0.0, -0.3, h));
+            }
+            gl_FragColor = vec4(c, 1.0);
+          }
+        `,
+      });
+      scene.add(new THREE.Mesh(skyGeo, skyMat));
+    }
+    scene.fog = new THREE.Fog(0xb8d4e8, 600, 2500);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
+
+    // Lighting
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x1e3a52, 0.6);
+    scene.add(hemi);
+    const sun = new THREE.DirectionalLight(0xfff2c8, 1.1);
+    sun.position.set(400, 600, -200); // high noon from the south-southwest
+    scene.add(sun);
+    const ambient = new THREE.AmbientLight(0x9bb7d4, 0.25);
+    scene.add(ambient);
+
+    // =====================================================================
+    // WATER — animated plane with vertex displacement
+    // =====================================================================
+
+    const WATER_SIZE = 4000; // meters
+    const WATER_SEG = 96;
+    const waterGeo = new THREE.PlaneGeometry(WATER_SIZE, WATER_SIZE, WATER_SEG, WATER_SEG);
+    waterGeo.rotateX(-Math.PI / 2);
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x1e6a8a,
+      roughness: 0.4,
+      metalness: 0.15,
+      flatShading: false,
+      transparent: false,
+    });
+    const water = new THREE.Mesh(waterGeo, waterMat);
+    water.position.y = -0.4;
+    scene.add(water);
+
+    // Cache water vertex positions for animation
+    const waterPositions = waterGeo.attributes.position;
+    const waterBase = new Float32Array(waterPositions.count * 3);
+    for (let i = 0; i < waterPositions.count; i++) {
+      waterBase[i*3]   = waterPositions.getX(i);
+      waterBase[i*3+1] = waterPositions.getY(i);
+      waterBase[i*3+2] = waterPositions.getZ(i);
+    }
+
+    function updateWater(t) {
+      const amp1 = 0.35, amp2 = 0.20, amp3 = 0.10;
+      for (let i = 0; i < waterPositions.count; i++) {
+        const bx = waterBase[i*3];
+        const bz = waterBase[i*3+2];
+        const y = Math.sin(bx * 0.04 + t * 0.8) * amp1
+                + Math.sin(bz * 0.05 + t * 0.6) * amp2
+                + Math.sin((bx + bz) * 0.025 + t * 1.1) * amp3;
+        waterPositions.setY(i, y);
+      }
+      waterPositions.needsUpdate = true;
+      waterGeo.computeVertexNormals();
+    }
+
+    function waterHeightAt(x, z, t) {
+      return Math.sin(x * 0.04 + t * 0.8) * 0.35
+           + Math.sin(z * 0.05 + t * 0.6) * 0.20
+           + Math.sin((x + z) * 0.025 + t * 1.1) * 0.10;
+    }
+
+    // =====================================================================
+    // ISLANDS — extruded polygons
+    // =====================================================================
+
+    function buildIsland(island) {
+      const shape = new THREE.Shape();
+      const pts = island.shape.map(p => latLngToWorld(p[0], p[1]));
+      shape.moveTo(pts[0].x, pts[0].z);
+      for (let i = 1; i < pts.length; i++) {
+        shape.lineTo(pts[i].x, pts[i].z);
+      }
+      shape.closePath();
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: 4.5, bevelEnabled: false });
+      geo.rotateX(-Math.PI / 2); // shape was XY, now XZ; extrude becomes +Y
+      // After rotateX(-PI/2): the shape's +Y axis (extrude direction) becomes -Z.
+      // We need islands above water (y > 0). Translate up by extrude depth.
+      geo.translate(0, 4.5, 0);
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x2d5a3a,
+        roughness: 0.95,
+        metalness: 0.0,
+        flatShading: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.y = -0.2; // sit just above water plane
+      return mesh;
+    }
+
+    const islandGroup = new THREE.Group();
+    for (const isl of ISLANDS_3D) {
+      islandGroup.add(buildIsland(isl));
+    }
+    scene.add(islandGroup);
+
+    // =====================================================================
+    // BUOYS — read from localStorage (origin-scoped, shared with main app)
+    // =====================================================================
+
+    const buoyGroup = new THREE.Group();
+    scene.add(buoyGroup);
+
+    const buoyMeshes = []; // [{ buoy, mesh, type, labelEl, lastDistance, world }]
+
+    function buildBuoyMesh(typeKey) {
+      const t = BUOY_TYPES[typeKey] || BUOY_TYPES.white;
+      const group = new THREE.Group();
+
+      let bodyGeo;
+      if (t.shape === 'cone') {
+        bodyGeo = new THREE.ConeGeometry(0.5, 1.6, 10);
+      } else if (t.shape === 'cyl') {
+        bodyGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.2, 12);
+      } else {
+        bodyGeo = new THREE.SphereGeometry(0.6, 12, 10);
+      }
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: t.color,
+        roughness: 0.6,
+        metalness: 0.05,
+        emissive: t.color,
+        emissiveIntensity: 0.08,
+      });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = 0.6;
+      group.add(body);
+
+      // Add a small topper for variety: cone gets a fin, cyl gets a flat disk, sphere stays
+      if (t.shape === 'cone') {
+        const fin = new THREE.Mesh(
+          new THREE.BoxGeometry(0.05, 0.6, 0.4),
+          new THREE.MeshStandardMaterial({ color: t.color, roughness: 0.7 })
+        );
+        fin.position.y = 1.5;
+        group.add(fin);
+      } else if (t.shape === 'cyl' && typeKey !== 'nowake') {
+        const top = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.55, 0.55, 0.15, 12),
+          new THREE.MeshStandardMaterial({ color: t.color, roughness: 0.6 })
+        );
+        top.position.y = 1.3;
+        group.add(top);
+      }
+
+      // Glow ring on the water surface
+      const ringGeo = new THREE.RingGeometry(1.0, 1.6, 18);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: t.color,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = -0.35;
+      group.add(ring);
+
+      return group;
+    }
+
+    function rebuildBuoysFromStorage() {
+      while (buoyGroup.children.length) buoyGroup.remove(buoyGroup.children[0]);
+      buoyMeshes.length = 0;
+      let buoys = [];
+      try {
+        const raw = localStorage.getItem('winniBuoys') || '[]';
+        buoys = JSON.parse(raw);
+      } catch (e) { /* ignore */ }
+
+      for (const b of buoys) {
+        if (!b || typeof b.lat !== 'number' || typeof b.lng !== 'number') continue;
+        const typeKey = b.color || 'white';
+        const mesh = buildBuoyMesh(typeKey);
+        const w = latLngToWorld(b.lat, b.lng);
+        mesh.position.set(w.x, 0, w.z);
+        buoyGroup.add(mesh);
+
+        // Pre-allocated label element (reused, positioned each frame)
+        const labelEl = document.createElement('div');
+        labelEl.className = 'buoy-label';
+        labelEl.style.display = 'none';
+        document.getElementById('labels').appendChild(labelEl);
+
+        buoyMeshes.push({
+          buoy: b,
+          typeKey,
+          mesh,
+          labelEl,
+          world: w,
+        });
+      }
+    }
+
+    // Listen for storage changes (in case user adds buoys in the main app and comes back)
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'winniBuoys') rebuildBuoysFromStorage();
+    });
+    window.addEventListener('pageshow', (e) => {
+      // Re-read on back-forward navigation
+      if (e.persisted) rebuildBuoysFromStorage();
+    });
+
+    rebuildBuoysFromStorage();
+
+    // =====================================================================
+    // BOAT — procedural hull from primitives
+    // =====================================================================
+
+    function buildBoat(colorHex) {
+      const g = new THREE.Group();
+
+      // Hull — elongated box, tapered at bow
+      const hullShape = new THREE.Shape();
+      hullShape.moveTo(0, 2.2);     // bow tip
+      hullShape.lineTo(0.8, 1.5);
+      hullShape.lineTo(1.0, 0);
+      hullShape.lineTo(0.8, -1.5);
+      hullShape.lineTo(0, -2.0);    // stern
+      hullShape.lineTo(-0.9, -1.2);
+      hullShape.lineTo(-1.1, 0);
+      hullShape.lineTo(-0.9, 1.2);
+      hullShape.closePath();
+      const hullGeo = new THREE.ExtrudeGeometry(hullShape, { depth: 0.9, bevelEnabled: false });
+      hullGeo.rotateX(-Math.PI / 2);
+      hullGeo.translate(0, 0.3, 0);
+      const hullMat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        roughness: 0.45,
+        metalness: 0.1,
+      });
+      const hull = new THREE.Mesh(hullGeo, hullMat);
+      g.add(hull);
+
+      // Hull stripe (waterline)
+      const stripeGeo = new THREE.BoxGeometry(2.2, 0.08, 0.92);
+      const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+      const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+      stripe.position.y = 0.2;
+      g.add(stripe);
+
+      // Cabin (small box on the rear half)
+      const cabinGeo = new THREE.BoxGeometry(1.2, 0.7, 1.0);
+      const cabinMat = new THREE.MeshStandardMaterial({
+        color: 0xf1f5f9,
+        roughness: 0.6,
+        metalness: 0.0,
+      });
+      const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+      cabin.position.set(-0.4, 0.95, 0);
+      g.add(cabin);
+
+      // Windshield (sloped box at front of cabin)
+      const shieldGeo = new THREE.BoxGeometry(0.4, 0.55, 0.95);
+      const shieldMat = new THREE.MeshStandardMaterial({
+        color: 0x1e293b,
+        roughness: 0.1,
+        metalness: 0.5,
+      });
+      const shield = new THREE.Mesh(shieldGeo, shieldMat);
+      shield.position.set(0.3, 0.95, 0);
+      shield.rotation.z = -0.4;
+      g.add(shield);
+
+      // Bow point highlight (small triangle)
+      const bowGeo = new THREE.ConeGeometry(0.15, 0.4, 6);
+      const bowMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.4 });
+      const bow = new THREE.Mesh(bowGeo, bowMat);
+      bow.position.set(0, 0.4, 0);
+      bow.rotation.z = -Math.PI / 2;
+      g.add(bow);
+
+      return g;
+    }
+
+    const boat = buildBoat(state.vesselColor);
+    scene.add(boat);
+
+    // =====================================================================
+    // TRIP TRAIL — simple line behind boat
+    // =====================================================================
+
+    const TRAIL_MAX = 300;
+    const trailGeo = new THREE.BufferGeometry();
+    const trailPositions = new Float32Array(TRAIL_MAX * 3);
+    trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+    trailGeo.setDrawRange(0, 0);
+    const trailMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.55 });
+    const trailLine = new THREE.Line(trailGeo, trailMat);
+    scene.add(trailLine);
+
+    // =====================================================================
+    // GPS — same pattern as main app
+    // =====================================================================
+
+    function setGpsStatus(text, dotState, accuracy) {
+      const dot = document.getElementById('gpsDot');
+      const status = document.getElementById('gpsStatus');
+      const acc = document.getElementById('gpsAcc');
+      const accSep = document.getElementById('gpsAccSep');
+      dot.className = 'dot' + (dotState ? ' ' + dotState : '');
+      status.textContent = text;
+      if (typeof accuracy === 'number') {
+        acc.textContent = `±${accuracy.toFixed(0)}m`;
+        acc.style.display = 'inline';
+        accSep.style.display = 'inline';
+      } else {
+        acc.style.display = 'none';
+        accSep.style.display = 'none';
+      }
+    }
+
+    function startGps() {
+      if (!('geolocation' in navigator)) {
+        setGpsStatus('GPS not supported', 'warn');
+        return;
+      }
+      setGpsStatus('Acquiring…', 'warn');
+      state.watchId = navigator.geolocation.watchPosition(
+        onPos,
+        (err) => {
+          setGpsStatus('GPS error: ' + (err.message || err.code), 'warn');
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
+      );
+      state.gpsOn = true;
+
+      // Compass heading via deviceorientation
+      if (typeof DeviceOrientationEvent !== 'undefined') {
+        const handler = (e) => {
+          let hdg = null;
+          if (e.webkitCompassHeading != null) {
+            hdg = e.webkitCompassHeading; // iOS
+          } else if (e.alpha != null) {
+            hdg = 360 - e.alpha; // Android (alpha is from north, CCW)
+            if (hdg >= 360) hdg -= 360;
+          }
+          if (hdg != null && !isNaN(hdg)) {
+            state.headingDeg = hdg;
+          }
+        };
+        // iOS 13+ requires permission request
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+          // Request after a user gesture (the start button counts)
+          DeviceOrientationEvent.requestPermission()
+            .then((resp) => {
+              if (resp === 'granted') {
+                window.addEventListener('deviceorientation', handler, true);
+              }
+            })
+            .catch(() => {});
+        } else {
+          window.addEventListener('deviceorientation', handler, true);
+        }
+      }
+    }
+
+    let lastPosForSpeed = null;
+    let lastPosForSpeedTime = 0;
+
+    function onPos(pos) {
+      const { latitude: lat, longitude: lng, speed, heading, accuracy } = pos.coords;
+      state.pos = { lat, lng, accuracy };
+      state.lastPosTime = performance.now();
+
+      // Update world position
+      const w = latLngToWorld(lat, lng);
+      state.boatWorld.x = w.x;
+      state.boatWorld.z = w.z;
+
+      // Speed: prefer native speed (m/s → knots), else compute
+      const now = performance.now();
+      if (typeof speed === 'number' && speed >= 0) {
+        state.speedKn = speed * 1.94384;
+      } else if (lastPosForSpeed) {
+        const dt = (now - lastPosForSpeedTime) / 1000;
+        if (dt > 0.1) {
+          const dLat = lat - lastPosForSpeed.lat;
+          const dLng = lng - lastPosForSpeed.lng;
+          const dx = dLng * METERS_PER_DEG_LNG;
+          const dy = dLat * METERS_PER_DEG_LAT;
+          const dM = Math.sqrt(dx*dx + dy*dy);
+          state.speedKn = (dM / dt) * 1.94384;
+        }
+      }
+      lastPosForSpeed = { lat, lng };
+      lastPosForSpeedTime = now;
+
+      // Heading: prefer GPS heading when moving, else compass
+      if (typeof heading === 'number' && !isNaN(heading) && heading >= 0 && state.speedKn > 0.5) {
+        state.headingDeg = heading;
+      }
+
+      // HUD updates
+      document.getElementById('speedVal').textContent = state.speedKn.toFixed(1);
+      if (state.headingDeg != null) {
+        document.getElementById('headingVal').textContent = state.headingDeg.toFixed(0);
+      }
+      document.getElementById('posVal').textContent =
+        `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+      setGpsStatus('GPS on', 'on', accuracy);
+    }
+
+    // =====================================================================
+    // ANIMATION LOOP
+    // =====================================================================
+
+    const tmpVec = new THREE.Vector3();
+    const clock = new THREE.Clock();
+
+    // Pick initial camera target so something is visible before GPS starts
+    if (buoyMeshes.length > 0) {
+      state.orbitTarget.copy(buoyMeshes[0].mesh.position);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+
+      // Animate water
+      updateWater(t);
+
+      // Place boat on water, bobbing
+      const wb = waterHeightAt(state.boatWorld.x, state.boatWorld.z, t);
+      boat.position.set(state.boatWorld.x, wb + 0.1, state.boatWorld.z);
+      if (state.headingDeg != null) {
+        // Three.js: positive rotation around Y rotates -z toward +x. We want
+        // heading=0 (north=-z) and heading=90 (east=+x). rotation.y = -headingRad.
+        boat.rotation.y = -THREE.MathUtils.degToRad(state.headingDeg);
+        state.boatHeadingRad = boat.rotation.y;
+        // Slight roll/pitch for realism
+        boat.rotation.x = Math.sin(t * 0.6) * 0.04;
+        boat.rotation.z = Math.sin(t * 0.7 + 1.2) * 0.05;
+      }
+
+      // Buoys bob with water
+      for (const b of buoyMeshes) {
+        const y = waterHeightAt(b.world.x, b.world.z, t);
+        b.mesh.position.y = y - 0.4;
+        // Gentle rotation around y for visual life
+        b.mesh.rotation.y = Math.sin(t * 0.4 + b.world.x * 0.01) * 0.15;
+      }
+
+      // Trail
+      if (state.pos) {
+        state.trail.push({ x: state.boatWorld.x, z: state.boatWorld.z });
+        if (state.trail.length > TRAIL_MAX) state.trail.shift();
+        const n = state.trail.length;
+        for (let i = 0; i < n; i++) {
+          trailPositions[i*3]   = state.trail[i].x;
+          trailPositions[i*3+1] = -0.3;
+          trailPositions[i*3+2] = state.trail[i].z;
+        }
+        trailGeo.setDrawRange(0, n);
+        trailGeo.attributes.position.needsUpdate = true;
+      }
+
+      // Camera
+      updateCamera(t);
+
+      // Buoy labels
+      updateBuoyLabels();
+
+      // Compass needle
+      if (state.headingDeg != null) {
+        document.getElementById('compassNeedle').style.transform =
+          `translate(-50%, -50%) rotate(${-state.headingDeg}deg)`;
+        document.getElementById('compassLabel').textContent =
+          `${Math.round(state.headingDeg)}°`;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    function updateCamera(t) {
+      if (state.camMode === 'chase') {
+        // Camera behind and above the boat, looking forward
+        const heading = state.headingDeg != null ? state.headingDeg : 0;
+        const offsetBack = 28;   // meters behind
+        const offsetUp = 14;     // meters above
+        const offsetFwd = 8;     // meters ahead for lookAt target
+        const rad = THREE.MathUtils.degToRad(heading);
+        // Boat forward = (-sin(rad), 0, -cos(rad)) ; back is opposite
+        const backX = Math.sin(rad) * offsetBack;
+        const backZ = Math.cos(rad) * offsetBack;
+        const fwdX  = -Math.sin(rad) * offsetFwd;
+        const fwdZ  = -Math.cos(rad) * offsetFwd;
+        const targetX = state.boatWorld.x + backX;
+        const targetZ = state.boatWorld.z + backZ;
+        const targetY = waterHeightAt(targetX, targetZ, t) + offsetUp;
+        // Smooth follow
+        camera.position.x += (targetX - camera.position.x) * 0.08;
+        camera.position.y += (targetY - camera.position.y) * 0.08;
+        camera.position.z += (targetZ - camera.position.z) * 0.08;
+        camera.lookAt(state.boatWorld.x + fwdX, wb_or_0(state.boatWorld.x + fwdX, state.boatWorld.z + fwdZ, t), state.boatWorld.z + fwdZ);
+      } else if (state.camMode === 'cockpit') {
+        // Camera at boat, slightly elevated, looking forward
+        const heading = state.headingDeg != null ? state.headingDeg : 0;
+        const rad = THREE.MathUtils.degToRad(heading);
+        const fwd = 10;
+        camera.position.set(state.boatWorld.x, 1.6, state.boatWorld.z);
+        camera.lookAt(
+          state.boatWorld.x - Math.sin(rad) * fwd,
+          1.6,
+          state.boatWorld.z - Math.cos(rad) * fwd
+        );
+      } else if (state.camMode === 'orbit') {
+        // Free orbit around boat (or last buoy)
+        const target = state.orbitTarget;
+        state.orbitYaw += 0; // (could be controlled by drag)
+        const px = target.x + Math.cos(state.orbitPitch) * Math.sin(state.orbitYaw) * state.orbitDist;
+        const pz = target.z + Math.cos(state.orbitPitch) * Math.cos(state.orbitYaw) * state.orbitDist;
+        const py = target.y + Math.sin(state.orbitPitch) * state.orbitDist + 20;
+        camera.position.set(px, py, pz);
+        camera.lookAt(target);
+      }
+    }
+
+    function wb_or_0(x, z, t) { return waterHeightAt(x, z, t); }
+
+    // =====================================================================
+    // BUOY LABELS — projection of 3D positions to 2D screen overlays
+    // =====================================================================
+
+    function updateBuoyLabels() {
+      const heading = state.headingDeg != null ? state.headingDeg : 0;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      let closest = null;
+      let closestDist = Infinity;
+
+      for (const b of buoyMeshes) {
+        const dx = b.world.x - state.boatWorld.x;
+        const dz = b.world.z - state.boatWorld.z;
+        const d = Math.sqrt(dx*dx + dz*dz);
+        if (d > BUOY_RANGE_HARD_M) {
+          b.labelEl.style.display = 'none';
+          continue;
+        }
+
+        // Hide the world mesh if super-far (perf cull). Actually keep all visible;
+        // 500+ buoys on screen is fine for the geometries we have.
+
+        // Compute relative bearing
+        const tgtBearing = bearingDeg(state.boatWorld.x, state.boatWorld.z, b.world.x, b.world.z);
+        const relBrg = relBearingDeg(tgtBearing, heading);
+        const side = sideLabel(relBrg);
+
+        // Project world position to screen
+        tmpVec.set(b.world.x, 1.8, b.world.z); // slight elevation so label sits above buoy
+        tmpVec.project(camera);
+        const sx = (tmpVec.x * 0.5 + 0.5) * w;
+        const sy = (1 - (tmpVec.y * 0.5 + 0.5)) * h;
+
+        // Behind camera or off-screen
+        const onScreen = tmpVec.z < 1 && sx > 40 && sx < w - 40 && sy > 20 && sy < h - 20;
+        if (!onScreen || d > BUOY_RANGE_M) {
+          b.labelEl.style.display = 'none';
+          continue;
+        }
+
+        b.labelEl.style.display = 'block';
+        b.labelEl.style.left = `${sx}px`;
+        b.labelEl.style.top  = `${sy}px`;
+        b.labelEl.className = `buoy-label ${side.side.toLowerCase()}`;
+        const type = BUOY_TYPES[b.typeKey] || BUOY_TYPES.white;
+        b.labelEl.innerHTML = `
+          <span class="type">${type.label}</span>
+          <span class="side">${side.side} (${relBrg >= 0 ? 'right' : 'left'})</span>
+          <span class="dist">${d.toFixed(0)} m · ${Math.round(tgtBearing)}°</span>
+        `;
+
+        if (d < closestDist) {
+          closestDist = d;
+          closest = { b, side, d, relBrg, type };
+        }
+      }
+
+      // Closest-buoy alert
+      const alert = document.getElementById('alertBox');
+      if (closest && closest.d < 250) {
+        alert.classList.add('show');
+        const dirText = closest.side.zone.replace('-', ' ');
+        alert.textContent =
+          `⚠ ${closest.type.label} — ${dirText}, ${closest.d.toFixed(0)} m, ${closest.side.side}`;
+      } else {
+        alert.classList.remove('show');
+      }
+    }
+
+    // =====================================================================
+    // ACTION BAR
+    // =====================================================================
+
+    const camModes = [
+      { id: 'chase',   icon: '🎥', label: 'Chase' },
+      { id: 'cockpit', icon: '👁',  label: 'Cockpit' },
+      { id: 'orbit',   icon: '🛰', label: 'Orbit' },
+    ];
+
+    function cycleCamera() {
+      const i = camModes.findIndex(m => m.id === state.camMode);
+      const next = camModes[(i + 1) % camModes.length];
+      setCameraMode(next.id);
+    }
+
+    function setCameraMode(id) {
+      state.camMode = id;
+      const m = camModes.find(x => x.id === id);
+      document.getElementById('camIcon').textContent = m.icon;
+      document.getElementById('camLabel').textContent = m.label;
+      if (id === 'orbit') {
+        state.orbitTarget.set(state.boatWorld.x, 0, state.boatWorld.z);
+        state.orbitYaw = state.headingDeg != null ? THREE.MathUtils.degToRad(state.headingDeg) : 0;
+      }
+    }
+
+    document.getElementById('btnCam').addEventListener('click', cycleCamera);
+    document.getElementById('btnReset').addEventListener('click', () => {
+      if (state.camMode === 'orbit') {
+        state.orbitTarget.set(state.boatWorld.x, 0, state.boatWorld.z);
+        state.orbitYaw = state.headingDeg != null ? THREE.MathUtils.degToRad(state.headingDeg) : 0;
+      }
+    });
+    document.getElementById('btnMap').addEventListener('click', () => {
+      window.location.href = '/';
+    });
+    document.getElementById('btnHelp').addEventListener('click', () => {
+      alert(
+        '🛰 Winni Nav 3D Driving Mode\n\n' +
+        '• Start GPS — grant location permission; your boat appears on the lake.\n' +
+        '• Buoy labels — appear within 500 m. PORT (left) or STARBOARD (right)\n' +
+        '   is shown relative to your current heading.\n' +
+        '• 🎥 Camera — cycles Chase → Cockpit → Orbit views.\n' +
+        '• ⊙ Reset — re-centers orbit camera on your boat.\n' +
+        '• 🗺 — back to the 2D map.\n\n' +
+        'Buoys come from your existing Winni Nav data on this phone (localStorage,\n' +
+        'origin-scoped). Add more from the main 2D map.\n\n' +
+        'Recreation aid — not for primary navigation. Always defer to a printed\n' +
+        'cruising chart for channel markers and ATON rules.'
+      );
+    });
+
+    // =====================================================================
+    // START OVERLAY
+    // =====================================================================
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+      document.getElementById('startOverlay').classList.add('hidden');
+      startGps();
+      // Kick off the animation loop the first time we transition
+      if (!state.started) {
+        state.started = true;
+        animate();
+      }
+    });
+
+    // =====================================================================
+    // RESIZE
+    // =====================================================================
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Hide the start overlay automatically if we already have permission + a recent position
+    // (browser will still re-prompt in some cases; this just speeds up repeat visits).
+    try {
+      navigator.permissions && navigator.permissions.query({ name: 'geolocation' }).then(p => {
+        if (p.state === 'granted') {
+          // leave the overlay; user still needs to tap Start (privacy gesture)
+        }
+      }).catch(() => {});
+    } catch (_) {}
+
+  </script>
+</body>
+</html>

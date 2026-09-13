@@ -7,6 +7,7 @@ Live: **https://lakewinni.goodbotai.tech**
 ## What it does
 
 - **Live GPS dot** for your boat (phone GPS, ~3 m accuracy) with a **pickable vessel icon** — 9 options (🚤 speedboat, ⛵ sailboat, 🛥 yacht, 🚣 kayak, 🛶 canoe, 🏄 paddleboard, 🤿 diver, 🎣 fishing, 🧜‍♀️ mermaid). Defaults to speedboat. Saved locally per device. First-time visitors are prompted when they tap Start GPS; everyone can change it any time from the 🚤 button in the action bar.
+- **🛰 3D Driving Mode** — chase-cam 3D view of the lake with live GPS, port/starboard guidance labels on every buoy within 500 m, three camera modes (chase / cockpit / orbit). Procedural Three.js — no asset pipeline. Tap the 🛰 in the action bar, or open **https://lakewinni.goodbotai.tech/3d.html** directly. Buoys come from the same `localStorage.winniBuoys` the 2D map writes to, so they appear automatically.
 - **Speed** in knots + **heading** in degrees + **compass rose**
 - **Public boat launches** — all 18+ NH launches with fees, parking notes, and restrictions
 - **Major islands** (rough polygons, for orientation only)

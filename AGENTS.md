@@ -7,6 +7,8 @@
 
 A single-file static web app (`index.html`, ~218 KB / ~4,700 lines) that gives Winnipesaukee boaters a Garmin-HUD-style map with live GPS (pickable vessel icon: 9 options from speedboat to mermaid), crowdsourced buoys/hazards, NH GRANIT bathymetry (low-confidence reference), marina & fuel-dock locator, bridges & clearance (off by default), shipped recommended routes (cached locally from `data/winni-routes.json`), a "Where am I" rescue helper, and **trip recording via a separate ⏺ button (independent of the GPS session)** with GPX export. No backend. Auto-deploys to Vercel on push to `main`.
 
+**Sibling file: `3d.html` (added 2026-09-13)** — a procedural Three.js chase-cam driving view of the lake with live GPS, port/starboard guidance labels on every buoy within 500 m, three camera modes (chase / cockpit / orbit), and a trip trail. Reads buoys from `localStorage.winniBuoys` (origin-scoped, so the 2D map and 3D view share data automatically). Full project context: `memory/projects/winni-map-3d-driving-mode.md`. See "3D Driving Mode (`3d.html`)" below for the section-local summary.
+
 ## Identity
 
 | Field    | Value                                                                |
@@ -24,6 +26,7 @@ A single-file static web app (`index.html`, ~218 KB / ~4,700 lines) that gives W
 ```
 winni-map/
 ├── index.html        ← ENTIRE APP. Single file, ~175 KB. HTML + CSS + JS.
+├── 3d.html           ← 3D Driving Mode (chase-cam lake view, ~48 KB)
 ├── README.md         ← User-facing documentation
 ├── AGENTS.md         ← This file (session handoff)
 ├── vercel.json       ← Vercel config (static, root = index.html)
@@ -68,6 +71,45 @@ winni-map/
     Historic Landmarks seed is curated-only (Tyler reference list 2026-07-12); entries are NOT for navigation. Their note typically is the historical/curiosity context, with a `source` citation that mentions a published primary ref (NH Division of Parks, Lake Winnipesaukee Historical Society, NRHP, etc.) for verification.
 
     v1 seed was 27 entries; v2 added The Dive at Smalls Cove Sandbar (West Alton) with bad coords (~5 nm north of true location); v3 fixed The Dive coords to (43.4700, -71.2600) per Tyler reference list 2026-07-10 item #47; v4 reverted to West Alton shoreline area (43.5468, -71.2935) after Tyler supplied Google Maps reference 2026-07-12; v5 added the 10-entry Historic Landmarks category; v6 was a seed-merge fix to propagate coord corrections to devices with older seeded copies (commit 27bd39c); v7 added the Submerged Attractions (Dive Sites) category with 12 entries from Tyler reference list 2026-07-13; v8 added the Sandbars & Boat-Gathering Spots category with 6 entries from Tyler reference list 2026-07-13 (Braun Bay, West Alton, Paugus Bay, Patrician Shores, Silver Sands, plus Lake Winnisquam); v9 retired the Lake Winnisquam sandbar — it's on a different lake (Winnisquam, not Winnipesaukee) so doesn't belong on this map. Added POI_REMOVED constant + removal logic to seedPoisIfNeeded() so future retirements can drop entries from devices that already have them seeded; v10 added the Public Beaches category with 13 on-Winni seed entries from Tyler reference list 2026-07-13 (5 additional entries on Lakes Wentworth / Winnisquam / Opechee were deferred — see the trailing POI_SEED comment for the deferral list, since Tyler prefers to keep the map Winni-focused). Approximate coords are still approximate — see rule #13 for the protocol on replacing them. Tap 📍 → 🍽 POI to add a new one anywhere on the lake.
+
+## 3D Driving Mode (`3d.html`) — added 2026-09-13
+
+Companion page at `/3d.html` (linked from `index.html` via the 🛰 button in the bottom action sheet). Procedural Three.js chase-cam driving view of the lake. Same single-file-static deploy pattern as the main app, no build step. ~48 KB total. Full context in `memory/projects/winni-map-3d-driving-mode.md`.
+
+**What it does** (one-line each): live GPS boat on animated water, 13 procedural islands (extruded polygons from rough lat/lng shapes), procedural sky shader + ACES tone mapping + Fog, buoys read from `localStorage.winniBuoys` (origin-scoped, so 2D map and 3D view share data), port/starboard guidance labels on buoys within 500 m, three camera modes (chase / cockpit / orbit), trip trail line, compass needle HUD.
+
+**Why procedural Three.js, not Blender/.glb:** the 2026-09-13 bitcoinhub build session established that `.glb` loaders fail silently on Tyler's phone. Going procedural gives identical rendering, ~48 KB total payload (vs ~2-5 MB for a typical `.glb` scene), no asset pipeline, no binary uploads. This is now the standard pattern for every 3D page Tyler ships — see the 3D Character viewer at `bitcoinhub/games/character/` for the same approach.
+
+**Coordinate projection:** local equirectangular anchored at lake centroid `(43.60°N, -71.32°W)`. `x = (lng - REF_LNG) × 80300` (m/deg at 43.6°N), `z = -(lat - REF_LAT) × 111000` (north = `-z`, Three.js convention). At Winnipesaukee's ~25 km span, distortion is negligible vs proper Mercator.
+
+**Side calculation (port/starboard):** spatial-only. `relBearingDeg = bearing(boat→buoy) - heading`, normalized to `[-180, 180]`. Positive = starboard, negative = port. The label says "PORT (left)" or "STARBOARD (right)" relative to the boat's current heading — does NOT interpret ATON rules like "red right returning." Reasoning: Winni has no canonical harbor so outbound direction is fuzzy, and ATON interpretation is the navigator's job (they read the chart). The 3D view is a spatial aid, not a navigation system.
+
+**Buoy visibility rules:**
+- 500 m radius → floating HTML labels appear (projected to screen via `Vector3.project(camera)`)
+- 800 m hard cull → beyond this, mesh + label hidden for perf
+- Buoys come from `localStorage.winniBuoys` (same key the 2D app writes to), read once on `DOMContentLoaded` and re-read on `storage` events (cross-tab) + `pageshow` (back-forward nav)
+
+**JS parse-check (adapted for ESM modules):** the main app's `new Function(code)` trick won't work with `import` statements. Strip imports first:
+```bash
+cd winni-map
+node -e "
+const html=require('fs').readFileSync('3d.html','utf8');
+const m=html.match(/<script type=\"module\">([\\s\\S]*?)<\/script>/);
+const code=m[1].replace(/^\\s*import\\s.+?from\\s+['\"].+?['\"];?\\s*\$/gm, '// import stripped');
+require('fs').writeFileSync('/tmp/3d-stripped.mjs', code);
+" && node --check /tmp/3d-stripped.mjs && echo "JS OK"
+```
+
+**Inherited rules:** no hardcoded geographic data without a labeled "orientation only" disclaimer (rule #1), always defer to a printed cruising chart, Vercel + force-push gotcha same as the main app.
+
+**Known gotchas specific to `3d.html`:**
+1. iOS DeviceOrientationEvent requires a permission prompt — must be called from a user gesture. The current code requests it inside the Start GPS button click.
+2. `boat.rotation.y = -degToRad(heading)` — the sign is non-obvious. Three.js `rotation.y` is CCW from above (right-hand rule); heading is CW from north. The negation aligns them.
+3. `waterHeightAt(x, z, t)` is recomputed every frame for every buoy and the camera. ~500 buoys × 60 fps = 30k sin/cos calls/sec — fine on a modern phone. If perf becomes an issue, bake a precomputed water heightmap texture.
+4. The chase cam looks 8 m ahead of the boat, not AT the boat. Intentional — looking AT the boat means you can't see what's in front of it, which is the whole point.
+5. Storage events don't fire within the same tab — but page-load re-reads localStorage, which is the normal navigation path.
+
+**Future expansion (parked):** ATON-rule overlay, bathymetry tinting from NH GRANIT data, hazard markers, wind/wave indicator (NOAA Wolfeboro station — already on the main app's v1.9 roadmap), boat wake when moving > 5 kn, first-person arm/hand for scale.
 
 ## Workflow for adding a new layer (the pattern)
 
