@@ -840,67 +840,149 @@
     // =====================================================================
 
     function buildBoat(colorHex) {
+      // Day boat — white deep-V hull with flared bow, blue rub-rail accent,
+      // tinted wraparound windshield, blue hardtop on 4 chrome posts, twin
+      // outboards, swim platform. Procedural primitives, ~30 meshes.
       const g = new THREE.Group();
 
-      // Hull — elongated box, tapered at bow
+      // Shared phong material helper — MeshPhongMaterial matches the rest of
+      // the scene (water/islands already use it). No IBL dependency.
+      function pm(opts) {
+        return new THREE.MeshPhongMaterial({
+          color: opts.color,
+          shininess: opts.shininess != null ? opts.shininess : 30,
+          specular: opts.specular != null ? opts.specular : 0x222222,
+          transparent: !!opts.transparent,
+          opacity: opts.opacity != null ? opts.opacity : 1.0,
+        });
+      }
+      // VESSEL_ICON color shows up as a thin accent stripe on the hull side
+      // (so picking different vessel icons in the 2D app gives a small hint
+      // of personalization without overriding the reference's white/blue palette).
+      function placed(geo, material, x, y, z) {
+        const m = new THREE.Mesh(geo, material);
+        m.position.set(x, y, z);
+        return m;
+      }
+
+      // Hull — deep-V with flared bow (curved Shape → ExtrudeGeometry)
       const hullShape = new THREE.Shape();
-      hullShape.moveTo(0, 2.2);     // bow tip
-      hullShape.lineTo(0.8, 1.5);
-      hullShape.lineTo(1.0, 0);
-      hullShape.lineTo(0.8, -1.5);
-      hullShape.lineTo(0, -2.0);    // stern
-      hullShape.lineTo(-0.9, -1.2);
-      hullShape.lineTo(-1.1, 0);
-      hullShape.lineTo(-0.9, 1.2);
-      hullShape.closePath();
+      hullShape.moveTo(0, 3.6);                          // sharp bow tip
+      hullShape.bezierCurveTo(0.5, 3.0, 1.2, 1.5, 1.4, 0); // bow flare to max beam at midship
+      hullShape.bezierCurveTo(1.4, -2.5, 0.8, -3.6, 0, -3.9);
+      hullShape.bezierCurveTo(-0.8, -3.6, -1.4, -2.5, -1.4, 0);
+      hullShape.bezierCurveTo(-1.2, 1.5, -0.5, 3.0, 0, 3.6);
       const hullGeo = new THREE.ExtrudeGeometry(hullShape, { depth: 0.9, bevelEnabled: false });
       hullGeo.rotateX(-Math.PI / 2);
-      hullGeo.translate(0, 0.3, 0);
-      const hullMat = new THREE.MeshStandardMaterial({
-        color: colorHex,
-        roughness: 0.45,
-        metalness: 0.1,
-      });
-      const hull = new THREE.Mesh(hullGeo, hullMat);
-      g.add(hull);
+      hullGeo.translate(0, 0.4, 0);
+      g.add(new THREE.Mesh(hullGeo, pm({ color: 0xfafcff, shininess: 40, specular: 0x666666 })));
 
-      // Hull stripe (waterline)
-      const stripeGeo = new THREE.BoxGeometry(2.2, 0.08, 0.92);
-      const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
-      const stripe = new THREE.Mesh(stripeGeo, stripeMat);
-      stripe.position.y = 0.2;
-      g.add(stripe);
+      // Blue rub-rail accent stripe (matches the reference's signature line)
+      g.add(placed(new THREE.BoxGeometry(2.85, 0.05, 7.7),
+        pm({ color: 0x4ea7e8, shininess: 50, specular: 0x88c0e8 }), 0, 0.55, 0));
 
-      // Cabin (small box on the rear half)
-      const cabinGeo = new THREE.BoxGeometry(1.2, 0.7, 1.0);
-      const cabinMat = new THREE.MeshStandardMaterial({
-        color: 0xf1f5f9,
-        roughness: 0.6,
-        metalness: 0.0,
-      });
-      const cabin = new THREE.Mesh(cabinGeo, cabinMat);
-      cabin.position.set(-0.4, 0.95, 0);
-      g.add(cabin);
+      // Vessel-icon accent: thin colored stripe just above the rub-rail.
+      // This is where `colorHex` shows up — a subtle hint of which vessel
+      // icon the user picked in the 2D map, without overpowering the
+      // reference's white/blue palette.
+      g.add(placed(new THREE.BoxGeometry(2.84, 0.025, 7.6),
+        pm({ color: colorHex, shininess: 40, specular: 0x666666 }), 0, 0.45, 0));
 
-      // Windshield (sloped box at front of cabin)
-      const shieldGeo = new THREE.BoxGeometry(0.4, 0.55, 0.95);
-      const shieldMat = new THREE.MeshStandardMaterial({
-        color: 0x1e293b,
-        roughness: 0.1,
-        metalness: 0.5,
-      });
-      const shield = new THREE.Mesh(shieldGeo, shieldMat);
-      shield.position.set(0.3, 0.95, 0);
-      shield.rotation.z = -0.4;
-      g.add(shield);
+      // Waterline accent (thin darker stripe below the rub-rail)
+      g.add(placed(new THREE.BoxGeometry(2.85, 0.025, 7.7),
+        pm({ color: 0x0f2553 }), 0, 0.35, 0));
 
-      // Bow point highlight (small triangle)
-      const bowGeo = new THREE.ConeGeometry(0.15, 0.4, 6);
-      const bowMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.4 });
-      const bow = new THREE.Mesh(bowGeo, bowMat);
-      bow.position.set(0, 0.4, 0);
-      bow.rotation.z = -Math.PI / 2;
-      g.add(bow);
+      // Deck
+      g.add(placed(new THREE.BoxGeometry(2.5, 0.08, 7.4),
+        pm({ color: 0xeef2f7 }), 0, 0.78, 0));
+
+      // Center console body (slightly to rear)
+      g.add(placed(new THREE.BoxGeometry(1.2, 1.2, 1.6),
+        pm({ color: 0xfafcff }), 0, 1.5, -0.4));
+
+      // Console dashboard (dark face for gauges)
+      g.add(placed(new THREE.BoxGeometry(1.22, 0.5, 0.06),
+        pm({ color: 0x1a2230, shininess: 50 }), 0, 1.85, 0.41));
+
+      // Steering wheel
+      const wheel = new THREE.Mesh(
+        new THREE.TorusGeometry(0.18, 0.025, 8, 16),
+        pm({ color: 0xc8c8d0, shininess: 90, specular: 0xeeeeee })
+      );
+      wheel.position.set(0, 1.85, 0.45);
+      wheel.rotation.x = Math.PI / 2 - 0.4;
+      g.add(wheel);
+
+      // Wraparound windshield frame (chrome tube along the curve)
+      const wfCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-1.3, 1.45, 1.0),
+        new THREE.Vector3(-1.0, 1.55, 0.4),
+        new THREE.Vector3(0, 1.65, -0.2),
+        new THREE.Vector3(1.0, 1.55, 0.4),
+        new THREE.Vector3(1.3, 1.45, 1.0),
+      ]);
+      const wfTube = new THREE.TubeGeometry(wfCurve, 32, 0.025, 4, false);
+      g.add(new THREE.Mesh(wfTube, pm({ color: 0xc8c8d0, shininess: 90 })));
+
+      // Tinted glass panel (the wraparound windshield itself)
+      g.add(placed(new THREE.BoxGeometry(2.7, 0.55, 0.04),
+        pm({ color: 0x5a8fbc, shininess: 110, specular: 0xc0c0c0,
+             transparent: true, opacity: 0.65 }), 0, 1.55, 0.42));
+
+      // Hardtop (blue canopy above the console — the icon from the reference)
+      g.add(placed(new THREE.BoxGeometry(2.4, 0.08, 1.9),
+        pm({ color: 0x3a90d8, shininess: 60, specular: 0x4488bb }), 0, 2.55, -0.3));
+
+      // Hardtop support posts (4 chrome cylinders at the corners)
+      for (const x of [-1.1, 1.1]) {
+        for (const z of [-1.15, 0.55]) {
+          g.add(placed(
+            new THREE.CylinderGeometry(0.045, 0.045, 1.45, 8),
+            pm({ color: 0xc8c8d0, shininess: 95, specular: 0xffffff }),
+            x, 1.85, z
+          ));
+        }
+      }
+
+      // Bow seat (U-shaped settee front)
+      g.add(placed(new THREE.BoxGeometry(2.0, 0.45, 0.35),
+        pm({ color: 0xdde2ea }), 0, 1.0, 2.3));
+
+      // Bow seat backrest
+      g.add(placed(new THREE.BoxGeometry(2.0, 0.45, 0.15),
+        pm({ color: 0xdde2ea }), 0, 1.05, 2.78));
+
+      // Side bulwarks (low rails on the bow)
+      for (const x of [-1.25, 1.25]) {
+        g.add(placed(new THREE.BoxGeometry(0.08, 0.45, 1.4),
+          pm({ color: 0xfafcff }), x, 1.05, 1.6));
+      }
+
+      // Forward sun pad cushions
+      for (const x of [-0.4, 0.4]) {
+        g.add(placed(new THREE.BoxGeometry(0.7, 0.08, 0.9),
+          pm({ color: 0xc8d4e0 }), x, 0.95, 1.5));
+      }
+
+      // Twin outboards at stern
+      for (const x of [-0.45, 0.45]) {
+        g.add(placed(new THREE.BoxGeometry(0.42, 0.55, 0.45),
+          pm({ color: 0x2a2a2a, shininess: 60 }), x, 0.65, -3.95));
+        g.add(placed(new THREE.CylinderGeometry(0.07, 0.07, 0.55, 10),
+          pm({ color: 0x1a1a1a }), x, 0.25, -3.95));
+      }
+
+      // Swim platform behind the outboards
+      g.add(placed(new THREE.BoxGeometry(2.4, 0.08, 0.6),
+        pm({ color: 0xfafcff }), 0, 0.55, -4.2));
+
+      // Blue transom door (matches the rub-rail blue)
+      g.add(placed(new THREE.BoxGeometry(1.5, 0.5, 0.05),
+        pm({ color: 0x4ea7e8 }), 0, 1.05, -3.85));
+
+      // Bow cleat hint
+      g.add(placed(new THREE.BoxGeometry(0.15, 0.05, 0.08),
+        pm({ color: 0xc8c8d0, shininess: 90 }), 0, 0.88, 3.5));
 
       return g;
     }
