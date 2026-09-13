@@ -726,6 +726,131 @@
     scene.add(islandGroup);
 
     // =====================================================================
+    // LAND — read shoreline from cached NH GRANIT bathymetry (shared w/ main app)
+    // =====================================================================
+    //
+    // The main /index.html app caches NH GRANIT bathymetry depth bands as a
+    // GeoJSON FeatureCollection under localStorage key 'winniBathyBandsCache'
+    // (30-day TTL). Each band is a filled polygon at a specific depth range;
+    // the shallowest band's outer ring traces the lake's actual shoreline.
+    // We use those polygons as holes punched into a flat elevated land plane
+    // around the lake perimeter.
+    //
+    // Origin-shared with the main app, so the cache is normally already
+    // populated. If localStorage is empty (user hasn't opened the 2D map
+    // recently), land is skipped and a console hint is left for debugging.
+
+    const BATHY_BANDS_CACHE_KEY = 'winniBathyBandsCache';
+    const BATHY_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+    function loadBathyBandsFromCache() {
+      try {
+        const raw = localStorage.getItem(BATHY_BANDS_CACHE_KEY);
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (!obj || !obj.fetchedAt || !obj.data) return null;
+        if (Date.now() - obj.fetchedAt > BATHY_CACHE_TTL_MS) return null;
+        return obj.data; // GeoJSON FeatureCollection
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function buildLandFromBathyBands(bandsGeoJSON) {
+      if (!bandsGeoJSON || !bandsGeoJSON.features || bandsGeoJSON.features.length === 0) {
+        return null;
+      }
+
+      // Find the shallowest depth band (lowest depthmin)
+      let minDepth = Infinity;
+      for (const f of bandsGeoJSON.features) {
+        const d = (f.properties && f.properties.depthmin);
+        if (typeof d === 'number' && d < minDepth) minDepth = d;
+      }
+      if (!isFinite(minDepth)) return null;
+
+      // All features at the shallowest depth = the actual water perimeter
+      const shallowFeatures = bandsGeoJSON.features.filter(f => {
+        const d = (f.properties && f.properties.depthmin);
+        return d === minDepth;
+      });
+
+      // Outer shape: large square sized to match the water plane (-30000, +30000)
+      // so the land visually covers everything outside the lake.
+      const S = 30000;
+      const outer = new THREE.Shape();
+      outer.moveTo(-S, -S);
+      outer.lineTo(S, -S);
+      outer.lineTo(S, S);
+      outer.lineTo(-S, S);
+      outer.closePath();
+
+      // Three.js Shape holes need CLOCKWISE winding (opposite of the outer CCW).
+      // GeoJSON Polygon outer rings are CCW per RFC 7946, so we reverse them.
+      let holeCount = 0;
+      for (const feature of shallowFeatures) {
+        const geom = feature.geometry;
+        if (!geom) continue;
+
+        const polygons = (geom.type === 'Polygon') ? [geom.coordinates] :
+                         (geom.type === 'MultiPolygon') ? geom.coordinates : [];
+        for (const poly of polygons) {
+          const ring = poly[0];
+          if (!ring || ring.length < 3) continue;
+          // Skip the duplicate closing point, then reverse to flip winding.
+          const reversed = ring.slice(0, -1).reverse();
+
+          const path = new THREE.Path();
+          let first = true;
+          let fx = 0, fz = 0;
+          for (const [lng, lat] of reversed) {
+            const w = latLngToWorld(lat, lng);
+            if (first) {
+              path.moveTo(w.x, w.z);
+              fx = w.x; fz = w.z;
+              first = false;
+            } else {
+              path.lineTo(w.x, w.z);
+            }
+          }
+          path.lineTo(fx, fz);
+          outer.holes.push(path);
+          holeCount++;
+        }
+      }
+
+      if (holeCount === 0) return null;
+
+      const landGeo = new THREE.ShapeGeometry(outer);
+      landGeo.rotateX(-Math.PI / 2); // lay flat on XZ plane
+      landGeo.computeVertexNormals();
+
+      const landMat = new THREE.MeshPhongMaterial({
+        color: 0x4a6b3a,   // forest green
+        shininess: 5,
+        specular: 0x111111,
+        side: THREE.DoubleSide,
+      });
+
+      const land = new THREE.Mesh(landGeo, landMat);
+      land.position.y = 0.3; // slightly above water (-0.4) so the waterline reads
+      return land;
+    }
+
+    let landFromBathy = null;
+    const cachedBathyBands = loadBathyBandsFromCache();
+    if (cachedBathyBands && cachedBathyBands.features) {
+      landFromBathy = buildLandFromBathyBands(cachedBathyBands);
+    }
+    if (landFromBathy) {
+      scene.add(landFromBathy);
+      const shallowest = cachedBathyBands.features[0]?.properties?.depthmin;
+      console.log(`[Winni3D] Land rendered from cached bathymetry (${cachedBathyBands.features.length} features, shallowest band = ${shallowest} ft)`);
+    } else {
+      console.log('[Winni3D] No cached bathymetry in localStorage. Land skipped — open the 2D map once to cache shoreline data.');
+    }
+
+    // =====================================================================
     // BUOYS — read from localStorage (origin-scoped, shared with main app)
     // =====================================================================
 
