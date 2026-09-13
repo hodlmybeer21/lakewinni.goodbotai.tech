@@ -573,16 +573,26 @@
     renderer.toneMappingExposure = 1.05;
 
     const scene = new THREE.Scene();
+    // Solid fallback background (covers any gap between sky-sphere render order
+    // and the rest of the scene). Three.js auto-converts this to sRGB on output.
+    scene.background = new THREE.Color(0xa8d5f0);
     // Sky gradient (light blue → white at horizon)
     {
       const skyGeo = new THREE.SphereGeometry(2000, 32, 16);
+      // Convert sRGB hex colors to linear before passing to the shader —
+      // ShaderMaterial doesn't get the renderer's automatic conversion, so
+      // we'd double-convert (sRGB→linear in tone mapping, then linear→sRGB on
+      // output) and end up with crushed colors. convertSRGBToLinear fixes that.
+      const conv = (hex) => new THREE.Color(hex).convertSRGBToLinear();
       const skyMat = new THREE.ShaderMaterial({
         side: THREE.BackSide,
         depthWrite: false,
+        depthTest: false,       // never cull against scene depth
+        toneMapped: false,      // sky already in display-ready space
         uniforms: {
-          topColor:    { value: new THREE.Color(0x4a8fcf) },
-          midColor:    { value: new THREE.Color(0xa8d5f0) },
-          bottomColor: { value: new THREE.Color(0xeef5fa) },
+          topColor:    { value: conv(0x4a8fcf) },
+          midColor:    { value: conv(0xa8d5f0) },
+          bottomColor: { value: conv(0xeef5fa) },
         },
         vertexShader: `
           varying vec3 vWorldPos;
@@ -609,7 +619,9 @@
           }
         `,
       });
-      scene.add(new THREE.Mesh(skyGeo, skyMat));
+      const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+      skyMesh.renderOrder = -1; // draw first, before everything else
+      scene.add(skyMesh);
     }
     scene.fog = new THREE.Fog(0xb8d4e8, 600, 2500);
 
@@ -632,10 +644,10 @@
     const WATER_SEG = 96;
     const waterGeo = new THREE.PlaneGeometry(WATER_SIZE, WATER_SIZE, WATER_SEG, WATER_SEG);
     waterGeo.rotateX(-Math.PI / 2);
-    const waterMat = new THREE.MeshStandardMaterial({
+    const waterMat = new THREE.MeshPhongMaterial({
       color: 0x1e6a8a,
-      roughness: 0.4,
-      metalness: 0.15,
+      shininess: 60,
+      specular: 0x88ccee,
       flatShading: false,
       transparent: false,
     });
@@ -689,10 +701,9 @@
       // After rotateX(-PI/2): the shape's +Y axis (extrude direction) becomes -Z.
       // We need islands above water (y > 0). Translate up by extrude depth.
       geo.translate(0, 4.5, 0);
-      const mat = new THREE.MeshStandardMaterial({
+      const mat = new THREE.MeshPhongMaterial({
         color: 0x2d5a3a,
-        roughness: 0.95,
-        metalness: 0.0,
+        shininess: 5,
         flatShading: false,
       });
       const mesh = new THREE.Mesh(geo, mat);
