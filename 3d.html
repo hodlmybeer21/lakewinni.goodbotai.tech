@@ -839,6 +839,47 @@
       scene.add(landFromOSM);
       const v = cachedOSMShoreline.features[0]?.geometry?.coordinates?.[0]?.length || 0;
       console.log(`[Winni3D] Land from cached OSM shoreline (${v} vertices)`);
+
+      // ALSO render the OSM water polygon AS a flat water mesh on top of
+      // the land. This avoids the hole-punching problem entirely — both
+      // ShapeGeometry and ExtrudeGeometry share the same earcut triangulator
+      // which chokes on complex polygons with holes. Instead, we render
+      // the water shape directly (no holes — just the outer ring) as a
+      // flat polygon at y=0.5. Result: blue water inside the OSM polygon,
+      // green land everywhere else. Works on the user's phone regardless
+      // of GPU differences with headless WebGL software rasterizers.
+      const feature = cachedOSMShoreline.features[0];
+      if (feature && feature.geometry && feature.geometry.coordinates) {
+        const ring = feature.geometry.coordinates[0];
+        if (ring && ring.length > 3) {
+          const waterShape = new THREE.Shape();
+          let first = true, fx = 0, fz = 0;
+          for (const [lng, lat] of ring) {
+            const w = latLngToWorld(lat, lng);
+            if (first) {
+              waterShape.moveTo(w.x, w.z);
+              fx = w.x; fz = w.z;
+              first = false;
+            } else {
+              waterShape.lineTo(w.x, w.z);
+            }
+          }
+          waterShape.lineTo(fx, fz);
+          const waterGeo = new THREE.ShapeGeometry(waterShape);
+          waterGeo.rotateX(-Math.PI / 2);
+          waterGeo.computeVertexNormals();
+          const waterMat = new THREE.MeshPhongMaterial({
+            color: 0x2a7a9a,        // slightly deeper blue than fallback
+            shininess: 70,
+            specular: 0xaaddff,
+            transparent: true,
+            opacity: 0.92,
+          });
+          const waterFromOSM = new THREE.Mesh(waterGeo, waterMat);
+          waterFromOSM.position.y = 0.5;  // sits above the land mesh (top at y=0.3)
+          scene.add(waterFromOSM);
+        }
+      }
     } else if (typeof fetch !== 'undefined') {
       // No cache — async fetch from Nominatim (silent, fires once per cold cache)
       fetch(OSM_NOMINATIM_URL, { headers: { 'User-Agent': 'WinniNav3D/1.0 (Tyler; hobby boating)' } })
@@ -855,8 +896,10 @@
           if (gj.type === 'Polygon') coords = [gj.coordinates[0]];
           else if (gj.type === 'MultiPolygon') coords = gj.coordinates;
           if (!coords.length) throw new Error('No polygon coords');
-          // Store the full OSM polygon — ExtrudeGeometry handles complex
-          // polygons with thousands of vertices robustly via ShapeUtils.
+          // Store the full OSM polygon — both ShapeGeometry and
+          // ExtrudeGeometry share the same earcut triangulator so neither
+          // helps with hole-punching; the water overlay below renders
+          // independently and reliably.
           const fc = {
             type: 'FeatureCollection',
             features: [{
@@ -869,11 +912,99 @@
           const land = buildLandFromOSM(fc);
           if (land) {
             scene.add(land);
-            console.log('[Winni3D] Land loaded from Nominatim (' + simplifiedRing.length + ' vertices)');
+            console.log('[Winni3D] Land loaded from Nominatim (' + coords[0][0].length + ' vertices)');
+          }
+          // Also add the OSM water overlay so the boat is on visible blue
+          // water inside the polygon regardless of land-hole triangulation success.
+          const ring = coords[0][0];
+          if (ring && ring.length > 3) {
+            const waterShape = new THREE.Shape();
+            let first = true, fx = 0, fz = 0;
+            for (const [lng, lat] of ring) {
+              const w = latLngToWorld(lat, lng);
+              if (first) {
+                waterShape.moveTo(w.x, w.z);
+                fx = w.x; fz = w.z;
+                first = false;
+              } else {
+                waterShape.lineTo(w.x, w.z);
+              }
+            }
+            waterShape.lineTo(fx, fz);
+            const waterGeo = new THREE.ShapeGeometry(waterShape);
+            waterGeo.rotateX(-Math.PI / 2);
+            waterGeo.computeVertexNormals();
+            const waterMat = new THREE.MeshPhongMaterial({
+              color: 0x2a7a9a,
+              shininess: 70,
+              specular: 0xaaddff,
+              transparent: true,
+              opacity: 0.92,
+            });
+            const waterFromOSM = new THREE.Mesh(waterGeo, waterMat);
+            waterFromOSM.position.y = 0.5;
+            scene.add(waterFromOSM);
           }
         })
         .catch(err => console.warn('[Winni3D] OSM fetch failed (offline? rate-limited?):', err.message));
     }
+
+    // ============================================================
+    // WAKE — V-shape foam ribbon trailing behind the boat
+    // ============================================================
+    // 6 vertices forming 2 triangles. Apex just behind boat stern, opens
+    // up to ~1.5m wide at 8m back. White/foam color with transparency.
+    const wakeGeo = new THREE.BufferGeometry();
+    const wakePositions = new Float32Array(3 * 6);
+    wakeGeo.setAttribute('position', new THREE.BufferAttribute(wakePositions, 3));
+    wakeGeo.setDrawRange(0, 6);
+    const wakeMat = new THREE.MeshBasicMaterial({
+      color: 0xf0f8ff,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const wakeMesh = new THREE.Mesh(wakeGeo, wakeMat);
+    wakeMesh.position.y = 0;  // vertices carry their own y; mesh sits at scene level
+    scene.add(wakeMesh);
+    window._wakeMesh = wakeMesh;
+
+    function updateWake() {
+      const boatX = state.boatWorld.x;
+      const boatZ = state.boatWorld.z;
+      const heading = state.boatHeadingRad;
+      // Boat's forward direction in world (heading 0 = N = -z).
+      const fwdX = -Math.sin(heading);
+      const fwdZ = -Math.cos(heading);
+      // Boat's right direction (perpendicular to forward, clockwise from above).
+      const rightX = Math.cos(heading);
+      const rightZ = -Math.sin(heading);
+      const STERN = 4.0;     // m behind boat where wake apex is
+      const LEN = 9.0;       // total wake length
+      const HW = 1.8;        // half-width at the tail
+      const Y = 0.45;        // just above water surface
+      // Apex (just behind boat)
+      const ax = boatX + fwdX * STERN, az = boatZ + fwdZ * STERN;
+      // Midpoint
+      const mx = boatX + fwdX * (STERN + LEN * 0.5), mz = boatZ + fwdZ * (STERN + LEN * 0.5);
+      // End (split left/right)
+      const ex = boatX + fwdX * (STERN + LEN), ez = boatZ + fwdZ * (STERN + LEN);
+      const lx = ex + rightX * HW, lz = ez + rightZ * HW;
+      const rx = ex - rightX * HW, rz = ez - rightZ * HW;
+      const p = wakeGeo.attributes.position.array;
+      // Triangle 1: apex, leftEnd, mid (left half of V)
+      p[0]=ax; p[1]=Y; p[2]=az; p[3]=lx; p[4]=Y; p[5]=lz; p[6]=mx; p[7]=Y; p[8]=mz;
+      // Triangle 2: apex, mid, rightEnd (right half of V)
+      p[9]=ax; p[10]=Y; p[11]=az; p[12]=mx; p[13]=Y; p[14]=mz; p[15]=rx; p[16]=Y; p[17]=rz;
+      wakeGeo.attributes.position.needsUpdate = true;
+      wakeGeo.computeBoundingSphere();
+    }
+    updateWake();
+
+    // =====================================================================
+    // LAND — read shoreline from cached NH GRANIT bathymetry (shared w/ main app)
+    // =====================================================================
 
     // =====================================================================
     // LAND — read shoreline from cached NH GRANIT bathymetry (shared w/ main app)
