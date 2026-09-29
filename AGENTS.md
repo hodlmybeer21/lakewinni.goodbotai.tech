@@ -295,3 +295,4 @@ If you break something, Tyler prefers you:
 2. Otherwise, ask before making a destructive change (especially anything that touches `localStorage` keys or removes geographic data)
 
 Tyler's Telegram: 8511611117. He communicates mostly by voice message (transcripts are auto-generated and posted as text) — make sure to read the conversation context blocks for the actual request, not just the most recent message.
+_Test commit from Hermes on 2026-09-28 to verify the GitHub → Vercel preview pipeline. Safe to revert._
